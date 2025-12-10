@@ -63,7 +63,12 @@ class AutoIntCategoryBinning(AbstractBinning):
 
 class AutoBinning(AbstractBinning):
     def __init__(self):
-        pass
+        self._force_low = None
+        self._force_high = None
+
+    def force_range(self, minval: Union[float, None], maxval: Union[float, None]):
+        self._force_low = minval
+        self._force_high = maxval
 
     def build_auto_axis(self, 
                         variables: List[AbstractVariable], 
@@ -81,6 +86,7 @@ class AutoBinning(AbstractBinning):
             lens.append(len(values[-1]))
 
         all_values = ak.to_numpy(ak.flatten(values, axis=None))
+        all_values = all_values[np.isfinite(all_values)]
         minval = np.nanmin(all_values, axis=None)
         maxval = np.nanmax(all_values, axis=None)
 
@@ -91,6 +97,12 @@ class AutoBinning(AbstractBinning):
         minlen = min(lens)
 
         dtype = all_values.dtype
+
+        if self._force_low is not None:
+            minval = self._force_low
+        if self._force_high is not None:
+            maxval = self._force_high
+
         if np.issubdtype(dtype, np.floating):
             #heuristic for a reasonable number of bins
             nbins = max(50, int(np.sqrt(minlen)))
