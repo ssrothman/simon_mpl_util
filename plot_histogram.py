@@ -6,8 +6,7 @@ from .Binning import AbstractBinning, AutoBinning, DefaultBinning
 
 from .histplot import simon_histplot
 
-from .util import setup_canvas, add_cms_legend, savefig
-from .place_text import place_text
+from .util import setup_canvas, add_cms_legend, savefig, ensure_same_length, add_text, draw_legend
 
 import hist
 import matplotlib.pyplot as plt
@@ -15,11 +14,11 @@ import awkward as ak
 
 from typing import List, Union
 
-def plot_histogram(variable: Union[AbstractVariable, List[AbstractVariable]], 
-                   cut: Union[AbstractCut, List[AbstractCut]], 
-                   dataset: Union[AbstractDataset, List[AbstractDataset]],
+def plot_histogram(variable_: Union[AbstractVariable, List[AbstractVariable]], 
+                   cut_: Union[AbstractCut, List[AbstractCut]], 
+                   dataset_: Union[AbstractDataset, List[AbstractDataset]],
                    binning : AbstractBinning,
-                   labels: Union[List[str], None] = None,
+                   labels_: Union[List[str], None] = None,
                    extratext : Union[str, None] = None,
                    isdata: bool = False,
                    density: bool = False,
@@ -27,39 +26,16 @@ def plot_histogram(variable: Union[AbstractVariable, List[AbstractVariable]],
                    logy: bool = False,
                    output_path: Union[str, None] = None):
     
-    if isinstance(cut, AbstractCut):
-        cut = [cut]
-    if isinstance(variable, AbstractVariable):
-        variable = [variable]
-    if isinstance(dataset, AbstractDataset):
-        dataset = [dataset]
-
-    maxlen = max(len(cut), len(variable), len(dataset))
-    if len(cut) not in [1, maxlen]:
-        raise ValueError("Length of cut list must be 1 or %d"%maxlen)
-    if len(variable) not in [1, maxlen]:
-        raise ValueError("Length of variable list must be 1 or %d"%maxlen)
-    if len(dataset) not in [1, maxlen]:
-        raise ValueError("Length of dataset list must be 1 or %d"%maxlen)
-    
-    if labels is not None and len(labels) != maxlen:
-        raise ValueError("Length of labels list must be %d"%maxlen)
-
-    if labels is None or len(labels) == 1:
+    if labels_ is None or len(labels_) == 1:
         nolegend = True
     else:
         nolegend = False
 
-    if labels is None:
-        labels = [''] * maxlen
+    if labels_ is None:
+        labels_ = ['']
 
-    if len(cut) == 1:
-        cut = cut * maxlen
-    if len(variable) == 1:
-        variable = variable * maxlen
-    if len(dataset) == 1:
-        dataset = dataset * maxlen
-
+    variable, cut, dataset, labels = ensure_same_length(variable_, cut_, dataset_, labels_)
+   
     if type(binning) is AutoBinning:
         axis = binning.build_auto_axis(variable, cut, dataset)
     elif type(binning) is DefaultBinning:
@@ -72,7 +48,7 @@ def plot_histogram(variable: Union[AbstractVariable, List[AbstractVariable]],
 
     vals = []
     for v, c, d, l in zip(variable, cut, dataset, labels):
-        _, value = plot_variable(v, c, d, axis, density, l, ax)
+        _, value = plot_histogram_(v, c, d, axis, density, l, ax)
         vals.append(value)
 
     ax.set_xlabel(variable[0].label)
@@ -91,34 +67,9 @@ def plot_histogram(variable: Union[AbstractVariable, List[AbstractVariable]],
     elif type(variable[0]) is DifferenceVariable or type(variable[0]) is RelativeResolutionVariable:
         ax.axvline(0.0, color='k', linestyle='dashed')
 
-    ccut = common_cuts(cut)
+    add_text(ax, cut, extratext)
 
-    if type(ccut) is not NoCut:
-        thetext = ccut.plottext
-    else:
-        thetext = ''
-
-    if extratext is not None:
-        thetext = extratext + '\n' + thetext
-
-    thetext = thetext.strip()
-
-    if thetext != '':
-        place_text(ax, thetext, loc='best', fontsize=24, bbox_opts={
-            'boxstyle': 'round,pad=0.3',
-            'facecolor': 'white',
-            'edgecolor': 'black',
-            'alpha': 0.8
-        })
-
-    if not nolegend:
-        ax.legend(
-            fontsize=18, 
-            loc='best',
-            framealpha=0.8,
-            borderpad=0.3,
-            frameon=True
-        )
+    draw_legend(ax, nolegend)
 
     plt.tight_layout()
 
@@ -127,7 +78,7 @@ def plot_histogram(variable: Union[AbstractVariable, List[AbstractVariable]],
         
     plt.close(fig)
 
-def plot_variable(variable: AbstractVariable, 
+def plot_histogram_(variable: AbstractVariable, 
                   cut: AbstractCut, 
                   dataset: AbstractDataset,
                   axis : hist.axis.AxesMixin,

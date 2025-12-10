@@ -1,7 +1,16 @@
+import matplotlib
 import matplotlib.pyplot as plt
-from .SetupConfig import config
+import numpy as np
 import mplhep as hep
+
+from .SetupConfig import config
+
+from typing import Union, List
+from .Cut import AbstractCut, common_cuts, NoCut
+from .place_text import place_text
+
 hep.style.use(hep.style.CMS)
+matplotlib.rcParams['savefig.dpi'] = 300
 
 def setup_canvas():
     fig = plt.figure(figsize=config['figsize'])
@@ -23,3 +32,64 @@ def savefig(fig, path: str):
     print("Saving figure %s" % (path))
     fig.savefig(path+'.png', dpi=300, bbox_inches='tight', format='png')
     fig.savefig(path+'.pdf', bbox_inches='tight', format='pdf')
+
+def ensure_same_length(*args):
+    result = []
+    for arg in args:
+        if isinstance(arg, list):
+            result.append(arg)
+        else:
+            result.append([arg])
+    
+    maxlen = max([len(x) for x in result])
+
+    for i in range(len(result)):
+        if len(result[i]) == 1:
+            result[i] = result[i] * maxlen
+        elif len(result[i]) != maxlen:
+            raise ValueError("All input arguments must have the same length or be of length 1")
+
+    return result
+
+def add_text(ax : plt.Axes, cut: Union[AbstractCut, List[AbstractCut]], extratext: Union[str, None]=None):
+    ccut = common_cuts(cut)
+
+    if type(ccut) is not NoCut:
+        thetext = ccut.plottext
+    else:
+        thetext = ''
+
+    if extratext is not None:
+        thetext = extratext + '\n' + thetext
+
+    thetext = thetext.strip()
+
+    if thetext != '':
+        place_text(ax, thetext, loc='best', fontsize=24, bbox_opts={
+            'boxstyle': 'round,pad=0.3',
+            'facecolor': 'white',
+            'edgecolor': 'black',
+            'alpha': 0.8
+        })
+
+def draw_legend(ax: plt.Axes, nolegend: bool, scale: float=1.0):
+    if not nolegend:
+        ldg = ax.legend(
+            fontsize=18, 
+            loc='best',
+            framealpha=0.8,
+            borderpad=0.3,
+            frameon=True,
+            markerscale=scale
+        )
+
+        #if markers are tiny, increase their size in legend
+        for handle in ldg.legend_handles: # pyright: ignore[reportAttributeAccessIssue]
+            if hasattr(handle, 'get_sizes'):
+                minsize = np.min(handle.get_sizes())
+                if minsize < 25: #arbitrary threshold. NB this is the square of the markersize
+
+                    #remove existing legend, and recursively callback with a larger markerscale
+                    ldg.remove()
+                    draw_legend(ax, nolegend, scale=scale+1)
+                    break
