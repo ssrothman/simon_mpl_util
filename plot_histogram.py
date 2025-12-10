@@ -2,7 +2,7 @@ from .SetupConfig import config
 from .Variable import AbstractVariable, variable_from_string, RatioVariable, DifferenceVariable, RelativeResolutionVariable
 from .Cut import AbstractCut, common_cuts, NoCut
 from .datasets import AbstractDataset
-from .Binning import AbstractBinning
+from .Binning import AbstractBinning, AutoBinning, DefaultBinning
 
 from .histplot import simon_histplot
 
@@ -24,7 +24,8 @@ def plot_histogram(variable: Union[AbstractVariable, List[AbstractVariable]],
                    isdata: bool = False,
                    density: bool = False,
                    logx: bool = False,
-                   logy: bool = False):
+                   logy: bool = False,
+                   output_path: Union[str, None] = None):
     
     if isinstance(cut, AbstractCut):
         cut = [cut]
@@ -59,12 +60,19 @@ def plot_histogram(variable: Union[AbstractVariable, List[AbstractVariable]],
     if len(dataset) == 1:
         dataset = dataset * maxlen
 
+    if type(binning) is AutoBinning:
+        axis = binning.build_auto_axis(variable, cut, dataset)
+    elif type(binning) is DefaultBinning:
+        axis = binning.build_default_axis(variable[0])
+    else:
+        axis = binning.build_axis(variable[0])
+
     fig, ax = setup_canvas()
     add_cms_legend(ax, isdata)
 
     vals = []
     for v, c, d, l in zip(variable, cut, dataset, labels):
-        _, value = plot_variable(v, c, d, binning, density, l, ax)
+        _, value = plot_variable(v, c, d, axis, density, l, ax)
         vals.append(value)
 
     ax.set_xlabel(variable[0].label)
@@ -113,13 +121,16 @@ def plot_histogram(variable: Union[AbstractVariable, List[AbstractVariable]],
         )
 
     plt.tight_layout()
-    savefig(fig, 'test')
+
+    if output_path is not None:
+        savefig(fig, output_path)
+        
     plt.close(fig)
 
 def plot_variable(variable: AbstractVariable, 
                   cut: AbstractCut, 
                   dataset: AbstractDataset,
-                  binning : AbstractBinning,
+                  axis : hist.axis.AxesMixin,
                   density: bool,
                   label: str,
                   ax : plt.Axes):
@@ -130,7 +141,6 @@ def plot_variable(variable: AbstractVariable,
     cut = cut.evaluate(dataset)
     val = variable.evaluate(dataset)
 
-    axis = binning.build_axis(variable)
     H = hist.Hist(
         axis,
         storage=hist.storage.Weight()
