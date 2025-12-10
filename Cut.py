@@ -20,7 +20,7 @@ class AbstractCut:
     
     #equality operator
     def __eq__(self, other):
-        return False
+        raise NotImplementedError()
 
 class NoCut(AbstractCut):
     def __init__(self):
@@ -40,6 +40,9 @@ class NoCut(AbstractCut):
     @property
     def plottext(self):
         return "Inclusive"
+
+    def __eq__(self, other):
+        return False 
 
 class EqualsCut(AbstractCut):
     def __init__(self, variable, value):
@@ -69,7 +72,7 @@ class EqualsCut(AbstractCut):
     def __eq__(self, other):
         if type(other) is not EqualsCut:
             return False
-        return self.variable.key == other.variable.key and self.value == other.value
+        return self.variable == other.variable and self.value == other.value
 
 class TwoSidedCut(AbstractCut):
     def __init__(self, variable, low, high):
@@ -83,7 +86,7 @@ class TwoSidedCut(AbstractCut):
     def __eq__(self, other):
         if type(other) is not TwoSidedCut:
             return False
-        return (self.variable.key == other.variable.key and
+        return (self.variable == other.variable and
                 self.low == other.low and
                 self.high == other.high)
 
@@ -137,7 +140,7 @@ class GreaterThanCut(AbstractCut):
     def __eq__(self, other):
         if type(other) is not GreaterThanCut:
             return False
-        return self.variable.key == other.variable.key and self.value == other.value
+        return self.variable == other.variable and self.value == other.value
 
 class LessThanCut(AbstractCut):
     def __init__(self, variable, value):
@@ -167,7 +170,7 @@ class LessThanCut(AbstractCut):
     def __eq__(self, other):
         if type(other) is not LessThanCut:
             return False
-        return self.variable.key == other.variable.key and self.value == other.value
+        return self.variable == other.variable and self.value == other.value
 
 class AndCuts(AbstractCut):
     def __init__(self, *cuts):
@@ -202,9 +205,20 @@ class AndCuts(AbstractCut):
 
 def common_cuts_(cut1, cut2):
     if type(cut1) is AndCuts and type(cut2) is not AndCuts:
-        return common_cuts(list(cut1.cuts) + [cut2])
+        common = []
+        for c1 in cut1.cuts:
+            if c1 == cut2:
+                common.append(c1)
+        if len(common) == 0:
+            return NoCut()
+        elif len(common) == 1:
+            return common[0]
+        else:
+            return AndCuts(*common)
+        
     elif type(cut2) is AndCuts and type(cut1) is not AndCuts:
-        return common_cuts([cut1] + list(cut2.cuts))
+        return common_cuts_(cut2, cut1)
+    
     elif type(cut1) is AndCuts and type(cut2) is AndCuts:
         c1s = list(cut1.cuts)
         c2s = list(cut2.cuts)
@@ -215,7 +229,12 @@ def common_cuts_(cut1, cut2):
                 if c1 == c2:
                     common.append(c1)
         
-        return AndCuts(*common)
+        if len(common) == 0:
+            return NoCut()
+        elif len(common) == 1:
+            return common[0]
+        else:
+            return AndCuts(*common)
 
     elif cut1 == cut2:
         return cut1

@@ -36,6 +36,9 @@ class AbstractVariable:
         else:
             return lookup_axis_label(self.key)
 
+    def __eq__(self, other):
+        raise NotImplementedError()
+
 class Variable(AbstractVariable):
     def __init__(self, name):
         self.name = name
@@ -51,6 +54,14 @@ class Variable(AbstractVariable):
     def key(self):
         return self.name
     
+    def __eq__(self, other):
+        if type(other) is not Variable:
+            return False
+        
+        name0 = self.name.split('.')[-1]
+        name1 = other.name.split('.')[-1]
+        return name0 == name1
+    
 class AkNumVariable(AbstractVariable):
     def __init__(self, name):
         self.name = name
@@ -65,6 +76,16 @@ class AkNumVariable(AbstractVariable):
     @property
     def key(self):
         return "N(%s)"%(self.name)
+    
+    def __eq__(self, other):
+        if type(other) is not AkNumVariable:
+            return False
+        
+        #ignore collection prefix
+        name0 = self.name.split('.')[-1]
+        name1 = other.name.split('.')[-1]
+        return name0 == name1
+
 
 class RatioVariable(AbstractVariable):
     def __init__(self, num, denom):
@@ -88,6 +109,12 @@ class RatioVariable(AbstractVariable):
     @property
     def key(self):
         return "%s_over_%s"%(self.num.key, self.denom.key)
+    
+    def __eq__(self, other):
+        if type(other) is not RatioVariable:
+            return False
+        
+        return self.num == other.num and self.denom == other.denom
 
 class ProductVariable(AbstractVariable):
     def __init__(self, var1, var2):
@@ -112,6 +139,12 @@ class ProductVariable(AbstractVariable):
     def key(self):
         return "%s_times_%s"%(self.var1.key, self.var2.key)
     
+    def __eq__(self, other):
+        if type(other) is not ProductVariable:
+            return False
+        
+        return self.var1 == other.var1 and self.var2 == other.var2
+
 class DifferenceVariable(AbstractVariable):
     def __init__(self, gen, reco):
         self.gen = gen
@@ -133,6 +166,11 @@ class DifferenceVariable(AbstractVariable):
     def key(self):
         return "%s_minus_%s"%(self.reco.key, self.gen.key)
     
+    def __eq__(self, other):
+        if type(other) is not DifferenceVariable:
+            return False
+        return self.gen == other.gen and self.reco == other.reco
+
 class SumVariable(AbstractVariable):
     def __init__(self, x1, x2):
         self.x1 = x1
@@ -154,7 +192,10 @@ class SumVariable(AbstractVariable):
     def key(self):
         return "%s_plus_%s"%(self.x1.key, self.x2.key)
     
-
+    def __eq__(self, other):
+        if type(other) is not SumVariable:
+            return False
+        return self.x1 == other.x1 and self.x2 == other.x2
 
 class CorrectionlibVariable(AbstractVariable):
     def __init__(self, var_l, path, key):
@@ -212,6 +253,11 @@ class UFuncVariable(AbstractVariable):
     def key(self):
         return 'UFUNC%s(%s)'%(self.ufunc.__name__, self.var.key)
     
+    def __eq__(self, other):
+        if type(other) is not UFuncVariable:
+            return False
+        return self.var == other.var and self.ufunc == other.ufunc
+
 class RateVariable(AbstractVariable):
     def __init__(self, binaryfield, wrt):
         if type(binaryfield) is str:
@@ -236,6 +282,11 @@ class RateVariable(AbstractVariable):
     def key(self):
         return "%s_rate_wrt_%s"%(self.binaryfield.key, self.wrt.key)
 
+    def __eq__(self, other):
+        if type(other) is not RateVariable:
+            return False
+        return self.binaryfield == other.binaryfield and self.wrt == other.wrt
+
 class RelativeResolutionVariable(AbstractVariable):
     def __init__(self, gen, reco):
         self.gen = gen
@@ -259,6 +310,11 @@ class RelativeResolutionVariable(AbstractVariable):
     def key(self):
         return "%s_minus_%s_over_%s"%(self.reco.key, self.gen.key, self.gen.key)
     
+    def __eq__(self, other):
+        if type(other) is not RelativeResolutionVariable:
+            return False
+        return self.gen == other.gen and self.reco == other.reco
+
 #utility variable to compute 3D magnitude from 3 component variables
 #not actually any new functionality 
 class Magnitude3dVariable(AbstractVariable):
@@ -295,6 +351,13 @@ class Magnitude3dVariable(AbstractVariable):
     def key(self):
         return "sqrt(%s^2 + %s^2 + %s^2)"%(self.xvar.key, self.yvar.key, self.zvar.key)
 
+    def __eq__(self, other):
+        if type(other) is not Magnitude3dVariable:
+            return False
+        return (self.xvar == other.xvar and
+                self.yvar == other.yvar and
+                self.zvar == other.zvar)
+
 class Distance3dVariable(AbstractVariable):
     def __init__(self, x1var, y1var, z1var, x2var, y2var, z2var):
         import numpy as np
@@ -330,3 +393,10 @@ class Distance3dVariable(AbstractVariable):
             self.dyvar.reco.key,
             self.dzvar.reco.key
         )
+    
+    def __eq__(self, other):
+        if type(other) is not Distance3dVariable:
+            return False
+        return (self.dxvar == other.dxvar and
+                self.dyvar == other.dyvar and
+                self.dzvar == other.dzvar)
