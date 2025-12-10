@@ -13,6 +13,13 @@ def lookup_axis_label(axiskey: str) -> str:
         key_pattern = key_pattern.replace('(', r'\(')
         key_pattern = key_pattern.replace(')', r'\)')
 
+        #escape carats
+        key_pattern = key_pattern.replace('^', r'\^')
+
+        #escape maths symbols
+        key_pattern = key_pattern.replace('+', r'\+')
+        key_pattern = key_pattern.replace('-', r'\-')
+
         key_pattern = key_pattern.replace("*", "[a-zA-Z0-9]*")  #convert wildcard * to regex for any alphanumeric characters [but NOT underscores]
         
         #need to match with no leading or trailing characters:
