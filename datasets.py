@@ -11,7 +11,7 @@ class AbstractDataset:
     def ensure_columns(self, columns):
         raise NotImplementedError()
 
-    def get_column(self, column_name):
+    def get_column(self, column_name, collection_name=None):
         raise NotImplementedError()
 
     def get_aknum_column(self, column_name):
@@ -36,13 +36,12 @@ class NanoEventsDataset(AbstractDataset):
         # NanoEvents loads all columns on demand, so nothing to do here
         pass
 
-    def get_column(self, column_name):
+    def get_column(self, column_name, collection_name=None):
         if '.' in column_name:
-            parts = column_name.split('.')
-            ak_array = self._events
-            for part in parts:
-                ak_array = ak_array[part]
-            return ak_array
+            raise ValueError("NanoEventsDataset.get_column: column_name '%s' contains '.'! Instead use collection_name argument."%(column_name))
+        
+        if collection_name is not None:
+            return self._events[collection_name][column_name]
         else:
             return self._events[column_name]
     
@@ -60,7 +59,10 @@ class ParquetDataset(AbstractDataset):
     def ensure_columns(self, columns):
         self._table = self._dataset.to_table(columns=columns)
     
-    def get_column(self, column_name):
+    def get_column(self, column_name, collection_name=None):
+        if collection_name is not None:
+            raise NotImplementedError("ParquetDataset does not support collection_name argument")
+        
         return self._table[column_name].to_numpy()
     
     def get_aknum_column(self, column_name):

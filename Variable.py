@@ -1,4 +1,6 @@
 from .SetupConfig import config, lookup_axis_label
+import copy
+from typing import List
 
 def variable_from_string(name):
     if 'over' in name:
@@ -8,14 +10,14 @@ def variable_from_string(name):
         var1, var2 = name.split('_times_')
         return ProductVariable(var1, var2)
     else:
-        return Variable(name)
+        return BasicVariable(name)
 
 class AbstractVariable:
     @property
     def columns(self):
         raise NotImplementedError()
 
-    def evaluate(self, table):
+    def evaluate(self, dataset):
         raise NotImplementedError()
 
     @property
@@ -39,29 +41,108 @@ class AbstractVariable:
     def __eq__(self, other):
         raise NotImplementedError()
 
-class Variable(AbstractVariable):
-    def __init__(self, name):
-        self.name = name
+    def set_collection_name(self, collection_name):
+        raise NotImplementedError()
+
+class BasicVariable(AbstractVariable):
+    def __init__(self, name, collection_name=None):
+        self._name = name
+        self._collection_name = collection_name
+
+        if "." in name and collection_name is None:
+            splitted = name.split(".")
+            self._collection_name = ".".join(splitted[:-1])
+            self._name = splitted[-1]
+        elif '.' in name:
+            raise ValueError("Variable name '%s' contains '.' but collection_name is also specified"%(name))
 
     @property
     def columns(self):
-        return [self.name]
+        if self._collection_name is None:
+            return [self._name]
+        else:
+            return [self._collection_name + "." + self._name]
 
-    def evaluate(self, table):
-        return table.get_column(self.name)
+    def evaluate(self, dataset):
+        return dataset.get_column(self._name, self._collection_name)
     
     @property
     def key(self):
-        return self.name
+        if self._collection_name is None:
+            return self._name
+        else:
+            return self._collection_name + "." + self._name
     
     def __eq__(self, other):
-        if type(other) is not Variable:
+        if type(other) is not BasicVariable:
             return False
         
-        name0 = self.name.split('.')[-1]
-        name1 = other.name.split('.')[-1]
-        return name0 == name1
+        #NB do NOT require collection name to match
+        #This allows e.g. ECALRecHit.x == HCALRecHit.x [desireable]
+        #But also potentially perverse situations like ECALRecHit.x == GenVertex.x [conceptually distinct?]
+        #No good solution to this currently
+        return self._name == other._name 
     
+    def set_collection_name(self, collection_name):
+        self._collection_name = collection_name
+
+class ConcatVariable(AbstractVariable):
+    def __init__(self, *vars):
+        self.vars_ = vars
+
+    @staticmethod
+    def build_for_collections(var : AbstractVariable, collections_l : List[str]):
+        vars = []
+        for coll in collections_l:
+            v = copy.deepcopy(var)
+            v.set_collection_name(coll)
+            vars.append(v)
+        result = ConcatVariable(*vars)
+        result.override_label(var.label)
+        return result
+
+    @property
+    def columns(self):
+        cols = []
+        for var in self.vars_:
+            cols += var.columns
+        return list(set(cols))
+    
+    def evaluate(self, dataset):
+        import awkward as ak
+
+        arrays = []
+        for var in self.vars_:
+            arrays.append(var.evaluate(dataset))
+        
+        return ak.concatenate(arrays)
+    
+    @property
+    def key(self):
+        keys = []
+        for var in self.vars_:
+            keys.append(var.key)
+        return "Concat(%s)"%("_".join(keys))
+    
+    def __eq__(self, other):
+        if type(other) is not ConcatVariable:
+            return False
+        
+        if len(self.vars_) != len(other.vars_):
+            return False
+        
+        for i in range(len(self.vars_)):
+            if self.vars_[i] != other.vars_[i]:
+                return False
+        
+        return True
+
+    def set_collection_name(self, collection_name):
+        print("WARNING: overwriting collection name for all variables in ConcatVariable object")
+        for var in self.vars_:
+            var.set_collection_name(collection_name)
+
+
 class AkNumVariable(AbstractVariable):
     def __init__(self, name):
         self.name = name
@@ -70,8 +151,8 @@ class AkNumVariable(AbstractVariable):
     def columns(self):
         return [self.name]
 
-    def evaluate(self, table):
-        return table.get_aknum_column(self.name)
+    def evaluate(self, dataset):
+        return dataset.get_aknum_column(self.name)
     
     @property
     def key(self):
@@ -81,21 +162,20 @@ class AkNumVariable(AbstractVariable):
         if type(other) is not AkNumVariable:
             return False
         
-        #ignore collection prefix
-        name0 = self.name.split('.')[-1]
-        name1 = other.name.split('.')[-1]
-        return name0 == name1
-
+        return self.name == other.name
+    
+    def set_collection_name(self, collection_name):
+        raise ValueError("AkNumVariable does not support set_collection_name")
 
 class RatioVariable(AbstractVariable):
     def __init__(self, num, denom):
         if type(num) is str:
-            self.num = Variable(num)
+            self.num = BasicVariable(num)
         else:
             self.num = num
 
         if type(denom) is str:
-            self.denom = Variable(denom)
+            self.denom = BasicVariable(denom)
         else:
             self.denom = denom
 
@@ -103,8 +183,8 @@ class RatioVariable(AbstractVariable):
     def columns(self):
         return list(set(self.num.columns + self.denom.columns))
 
-    def evaluate(self, table):
-        return self.num.evaluate(table) / self.denom.evaluate(table)
+    def evaluate(self, dataset):
+        return self.num.evaluate(dataset) / self.denom.evaluate(dataset)
 
     @property
     def key(self):
@@ -116,15 +196,19 @@ class RatioVariable(AbstractVariable):
         
         return self.num == other.num and self.denom == other.denom
 
+    def set_collection_name(self, collection_name):
+        self.num.set_collection_name(collection_name)
+        self.denom.set_collection_name(collection_name)
+
 class ProductVariable(AbstractVariable):
     def __init__(self, var1, var2):
         if type(var1) is str:
-            self.var1 = Variable(var1)
+            self.var1 = BasicVariable(var1)
         else:
             self.var1 = var1
 
         if type(var2) is str:
-            self.var2 = Variable(var2)
+            self.var2 = BasicVariable(var2)
         else:
             self.var2 = var2
 
@@ -132,8 +216,8 @@ class ProductVariable(AbstractVariable):
     def columns(self):
         return self.var1.columns + self.var2.columns
 
-    def evaluate(self, table):
-        return self.var1.evaluate(table) * self.var2.evaluate(table)
+    def evaluate(self, dataset):
+        return self.var1.evaluate(dataset) * self.var2.evaluate(dataset)
 
     @property
     def key(self):
@@ -144,6 +228,10 @@ class ProductVariable(AbstractVariable):
             return False
         
         return self.var1 == other.var1 and self.var2 == other.var2
+
+    def set_collection_name(self, collection_name):
+        self.var1.set_collection_name(collection_name)
+        self.var2.set_collection_name(collection_name)
 
 class DifferenceVariable(AbstractVariable):
     def __init__(self, gen, reco):
@@ -159,8 +247,8 @@ class DifferenceVariable(AbstractVariable):
     def columns(self):
         return list(set(self.gen.columns + self.reco.columns))
 
-    def evaluate(self, table):
-        return self.reco.evaluate(table) - self.gen.evaluate(table)
+    def evaluate(self, dataset):
+        return self.reco.evaluate(dataset) - self.gen.evaluate(dataset)
 
     @property
     def key(self):
@@ -170,6 +258,10 @@ class DifferenceVariable(AbstractVariable):
         if type(other) is not DifferenceVariable:
             return False
         return self.gen == other.gen and self.reco == other.reco
+
+    def set_collection_name(self, collection_name):
+        self.gen.set_collection_name(collection_name)
+        self.reco.set_collection_name(collection_name)
 
 class SumVariable(AbstractVariable):
     def __init__(self, x1, x2):
@@ -185,8 +277,8 @@ class SumVariable(AbstractVariable):
     def columns(self):
         return list(set(self.x1.columns + self.x2.columns))
 
-    def evaluate(self, table):
-        return self.x1.evaluate(table) + self.x2.evaluate(table)
+    def evaluate(self, dataset):
+        return self.x1.evaluate(dataset) + self.x2.evaluate(dataset)
 
     @property
     def key(self):
@@ -196,6 +288,10 @@ class SumVariable(AbstractVariable):
         if type(other) is not SumVariable:
             return False
         return self.x1 == other.x1 and self.x2 == other.x2
+
+    def set_collection_name(self, collection_name):
+        self.x1.set_collection_name(collection_name)
+        self.x2.set_collection_name(collection_name)
 
 class CorrectionlibVariable(AbstractVariable):
     def __init__(self, var_l, path, key):
@@ -222,10 +318,10 @@ class CorrectionlibVariable(AbstractVariable):
             cols += var.columns
         return list(set(cols))
 
-    def evaluate(self, table):
+    def evaluate(self, dataset):
         args = []
         for var in self.var_l:
-            args.append(var.evaluate(table))
+            args.append(var.evaluate(dataset))
 
         return self.eval(*args)
 
@@ -233,6 +329,10 @@ class CorrectionlibVariable(AbstractVariable):
     def key(self):
         return "CORRECTIONLIB(%s)"%(self.csetkey)
 
+    def set_collection_name(self, collection_name):
+        for var in self.var_l:
+            var.set_collection_name(collection_name)
+    
 class UFuncVariable(AbstractVariable):
     def __init__(self, var, ufunc):
         if type(var) is str:
@@ -246,8 +346,8 @@ class UFuncVariable(AbstractVariable):
     def columns(self):
         return self.var.columns
 
-    def evaluate(self, table):
-        return self.ufunc(self.var.evaluate(table))
+    def evaluate(self, dataset):
+        return self.ufunc(self.var.evaluate(dataset))
 
     @property
     def key(self):
@@ -258,15 +358,18 @@ class UFuncVariable(AbstractVariable):
             return False
         return self.var == other.var and self.ufunc == other.ufunc
 
+    def set_collection_name(self, collection_name):
+        self.var.set_collection_name(collection_name)
+
 class RateVariable(AbstractVariable):
     def __init__(self, binaryfield, wrt):
         if type(binaryfield) is str:
-            self.binaryfield = Variable(binaryfield)
+            self.binaryfield = BasicVariable(binaryfield)
         else:
             self.binaryfield = binaryfield
 
         if type(wrt) is str:
-            self.wrt = Variable(wrt)
+            self.wrt = BasicVariable(wrt)
         else:
             self.wrt = wrt
 
@@ -274,9 +377,9 @@ class RateVariable(AbstractVariable):
     def columns(self):
         return list(set(self.binaryfield.columns + self.wrt.columns))
 
-    def evaluate(self, table):
-        return [self.binaryfield.evaluate(table),
-                self.wrt.evaluate(table)]
+    def evaluate(self, dataset):
+        return [self.binaryfield.evaluate(dataset),
+                self.wrt.evaluate(dataset)]
 
     @property
     def key(self):
@@ -286,6 +389,10 @@ class RateVariable(AbstractVariable):
         if type(other) is not RateVariable:
             return False
         return self.binaryfield == other.binaryfield and self.wrt == other.wrt
+
+    def set_collection_name(self, collection_name):
+        self.binaryfield.set_collection_name(collection_name)
+        self.wrt.set_collection_name(collection_name)
 
 class RelativeResolutionVariable(AbstractVariable):
     def __init__(self, gen, reco):
@@ -301,9 +408,9 @@ class RelativeResolutionVariable(AbstractVariable):
     def columns(self):
         return list(set(self.gen.columns + self.reco.columns))
     
-    def evaluate(self, table):
-        gen = self.gen.evaluate(table)
-        reco = self.reco.evaluate(table)
+    def evaluate(self, dataset):
+        gen = self.gen.evaluate(dataset)
+        reco = self.reco.evaluate(dataset)
         return (reco - gen) / gen
 
     @property
@@ -314,6 +421,10 @@ class RelativeResolutionVariable(AbstractVariable):
         if type(other) is not RelativeResolutionVariable:
             return False
         return self.gen == other.gen and self.reco == other.reco
+
+    def set_collection_name(self, collection_name):
+        self.gen.set_collection_name(collection_name)
+        self.reco.set_collection_name(collection_name)
 
 #utility variable to compute 3D magnitude from 3 component variables
 #not actually any new functionality 
@@ -344,8 +455,8 @@ class Magnitude3dVariable(AbstractVariable):
             self.zvar.columns
         ))  
     
-    def evaluate(self, table):
-        return self.rvar.evaluate(table)
+    def evaluate(self, dataset):
+        return self.rvar.evaluate(dataset)
     
     @property
     def key(self):
@@ -357,6 +468,12 @@ class Magnitude3dVariable(AbstractVariable):
         return (self.xvar == other.xvar and
                 self.yvar == other.yvar and
                 self.zvar == other.zvar)
+
+    def set_collection_name(self, collection_name):
+        self.rvar.set_collection_name(collection_name)
+        self.xvar.set_collection_name(collection_name)
+        self.yvar.set_collection_name(collection_name)
+        self.zvar.set_collection_name(collection_name)
 
 class Distance3dVariable(AbstractVariable):
     def __init__(self, x1var, y1var, z1var, x2var, y2var, z2var):
@@ -380,8 +497,8 @@ class Distance3dVariable(AbstractVariable):
             self.dzvar.columns
         ))  
     
-    def evaluate(self, table):
-        return self.magnitude_var.evaluate(table)
+    def evaluate(self, dataset):
+        return self.magnitude_var.evaluate(dataset)
     
     @property
     def key(self):
@@ -400,3 +517,9 @@ class Distance3dVariable(AbstractVariable):
         return (self.dxvar == other.dxvar and
                 self.dyvar == other.dyvar and
                 self.dzvar == other.dzvar)
+    
+    def set_collection_name(self, collection_name):
+        self.dxvar.set_collection_name(collection_name)
+        self.dyvar.set_collection_name(collection_name)
+        self.dzvar.set_collection_name(collection_name)
+        self.magnitude_var.set_collection_name(collection_name)

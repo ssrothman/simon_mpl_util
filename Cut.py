@@ -1,13 +1,15 @@
 from .Variable import variable_from_string
 from .SetupConfig import config
 import numpy as np
+import copy
+from typing import List, Sequence, Union
 
 class AbstractCut:
     @property
     def columns(self):
         raise NotImplementedError()
 
-    def evaluate(self, table):
+    def evaluate(self, dataset):
         raise NotImplementedError()
 
     @property
@@ -21,6 +23,9 @@ class AbstractCut:
     #equality operator
     def __eq__(self, other):
         raise NotImplementedError()
+    
+    def set_collection_name(self, collection_name):
+        raise NotImplementedError()
 
 class NoCut(AbstractCut):
     def __init__(self):
@@ -30,8 +35,8 @@ class NoCut(AbstractCut):
     def columns(self):
         return []
 
-    def evaluate(self, table):
-        return np.ones(table.num_rows, dtype=bool)
+    def evaluate(self, dataset):
+        return np.ones(dataset.num_rows, dtype=bool)
 
     @property
     def key(self):
@@ -43,6 +48,9 @@ class NoCut(AbstractCut):
 
     def __eq__(self, other):
         return False 
+    
+    def set_collection_name(self, collection_name):
+        pass
 
 class EqualsCut(AbstractCut):
     def __init__(self, variable, value):
@@ -56,8 +64,8 @@ class EqualsCut(AbstractCut):
     def columns(self):
         return self.variable.columns
 
-    def evaluate(self, table):
-        ev = self.variable.evaluate(table)
+    def evaluate(self, dataset):
+        ev = self.variable.evaluate(dataset)
         return ev == self.value
 
     @property
@@ -73,6 +81,9 @@ class EqualsCut(AbstractCut):
         if type(other) is not EqualsCut:
             return False
         return self.variable == other.variable and self.value == other.value
+
+    def set_collection_name(self, collection_name):
+        self.variable.set_collection_name(collection_name)
 
 class TwoSidedCut(AbstractCut):
     def __init__(self, variable, low, high):
@@ -94,8 +105,8 @@ class TwoSidedCut(AbstractCut):
     def columns(self):
         return self.variable.columns
 
-    def evaluate(self, table):
-        ev = self.variable.evaluate(table)
+    def evaluate(self, dataset):
+        ev = self.variable.evaluate(dataset)
         return np.logical_and(
             ev >= self.low,
             ev < self.high
@@ -112,6 +123,9 @@ class TwoSidedCut(AbstractCut):
                 self.variable.label, 
                 self.high)
     
+    def set_collection_name(self, collection_name):
+        self.variable.set_collection_name(collection_name)
+
 class GreaterThanCut(AbstractCut):
     def __init__(self, variable, value):
         self.value = value
@@ -124,8 +138,8 @@ class GreaterThanCut(AbstractCut):
     def columns(self):
         return self.variable.columns
 
-    def evaluate(self, table):
-        ev = self.variable.evaluate(table)
+    def evaluate(self, dataset):
+        ev = self.variable.evaluate(dataset)
         return ev >= self.value
 
     @property
@@ -142,6 +156,9 @@ class GreaterThanCut(AbstractCut):
             return False
         return self.variable == other.variable and self.value == other.value
 
+    def set_collection_name(self, collection_name):
+        self.variable.set_collection_name(collection_name)
+
 class LessThanCut(AbstractCut):
     def __init__(self, variable, value):
         self.value = value
@@ -154,8 +171,8 @@ class LessThanCut(AbstractCut):
     def columns(self):
         return self.variable.columns
 
-    def evaluate(self, table):
-        ev = self.variable.evaluate(table)
+    def evaluate(self, dataset):
+        ev = self.variable.evaluate(dataset)
         return ev < self.value
 
     @property
@@ -172,6 +189,9 @@ class LessThanCut(AbstractCut):
             return False
         return self.variable == other.variable and self.value == other.value
 
+    def set_collection_name(self, collection_name):
+        self.variable.set_collection_name(collection_name)
+
 class AndCuts(AbstractCut):
     def __init__(self, *cuts):
         self.cuts = cuts
@@ -183,10 +203,10 @@ class AndCuts(AbstractCut):
             cols += cut.columns
         return list(set(cols))
 
-    def evaluate(self, table):
-        mask = self.cuts[0].evaluate(table)
+    def evaluate(self, dataset):
+        mask = self.cuts[0].evaluate(dataset)
         for cut in self.cuts[1:]:
-            mask = np.logical_and(mask, cut.evaluate(table))
+            mask = np.logical_and(mask, cut.evaluate(dataset))
         return mask
 
     @property
@@ -202,6 +222,67 @@ class AndCuts(AbstractCut):
         for cut in self.cuts[1:]:
             result += '\n' + cut.plottext
         return result
+
+    def set_collection_name(self, collection_name):
+        for cut in self.cuts:
+            cut.set_collection_name(collection_name)
+
+class ConcatCut(AbstractCut):
+    def __init__(self, *cuts):
+        self.cuts = cuts
+
+    @staticmethod
+    def build_for_collections(cut : AbstractCut, collections_l : List[str], unique_cuts_l : Union[None, Sequence[AbstractCut]]=None):
+        if unique_cuts_l is not None and len(unique_cuts_l) != len(collections_l):
+            raise ValueError("ConcatCut.build_for_collections: unique_cuts_l length does not match collections_l length")
+        
+        if unique_cuts_l is None:
+            unique_cuts_l = [NoCut()] * len(collections_l)
+
+        cuts = []
+        for coll, ucut in zip(collections_l, unique_cuts_l):
+            c = copy.deepcopy(cut)
+            c.set_collection_name(coll)
+            cuts.append(AndCuts(c, ucut))
+            
+        return ConcatCut(*cuts)
+
+    @property
+    def columns(self):
+        cols = []
+        for cut in self.cuts:
+            cols += cut.columns
+        return list(set(cols))
+
+    def evaluate(self, dataset):
+        masks = [cut.evaluate(dataset) for cut in self.cuts]
+        return np.concatenate(masks)
+
+    @property
+    def key(self):
+        return "CONCAT(" + "_".join([cut.key for cut in self.cuts]) + ")"
+
+    @property
+    def plottext(self):
+        result = self.cuts[0].plottext
+        for cut in self.cuts[1:]:
+            result += '\n' + cut.plottext
+        return result
+
+    def set_collection_name(self, collection_name):
+        print("WARNING: overwriting collection name for all cuts in ConcatCut object")
+        for cut in self.cuts:
+            cut.set_collection_name(collection_name)
+
+    def __eq__(self, other):
+        if type(other) is not ConcatCut:
+            return False
+        if len(self.cuts) != len(other.cuts):
+            return False
+        for cut1, cut2 in zip(self.cuts, other.cuts):
+            if cut1 != cut2:
+                return False
+        return True
 
 def common_cuts_(cut1, cut2):
     if type(cut1) is AndCuts and type(cut2) is not AndCuts:
