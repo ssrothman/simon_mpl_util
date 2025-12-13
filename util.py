@@ -72,16 +72,29 @@ def add_text(ax : plt.Axes, cut: Union[AbstractCut, List[AbstractCut]], extratex
             'alpha': 0.8
         })
 
-def draw_legend(ax: plt.Axes, nolegend: bool, scale: float=1.0):
+def draw_legend(ax: plt.Axes, nolegend: bool, scale: float=1.0, loc: Union[str, int, tuple] ='best'):
     if not nolegend:
-        ldg = ax.legend(
-            fontsize=18, 
-            loc='best',
-            framealpha=0.8,
-            borderpad=0.3,
-            frameon=True,
-            markerscale=scale
-        )
+        if type(loc) in [int, str]:
+            ldg = ax.legend(
+                fontsize=18, 
+                loc=loc,
+                framealpha=0.8,
+                borderpad=0.3,
+                frameon=True,
+                markerscale=scale
+            )
+        elif type(loc) is tuple:
+            ldg = ax.legend(
+                fontsize=18, 
+                bbox_to_anchor=loc[:2],
+                loc=loc[2],
+                framealpha=0.8,
+                borderpad=0.3,
+                frameon=True,
+                markerscale=scale
+            )
+        else:
+            raise ValueError("draw_legend: loc argument has invalid type %s"%(type(loc)))
 
         #if markers are tiny, increase their size in legend
         for handle in ldg.legend_handles: # pyright: ignore[reportAttributeAccessIssue]
@@ -91,5 +104,5 @@ def draw_legend(ax: plt.Axes, nolegend: bool, scale: float=1.0):
 
                     #remove existing legend, and recursively callback with a larger markerscale
                     ldg.remove()
-                    draw_legend(ax, nolegend, scale=scale+1)
+                    draw_legend(ax, nolegend, scale=scale+1, loc=loc)
                     break

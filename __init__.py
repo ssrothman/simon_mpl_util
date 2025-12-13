@@ -7,3 +7,5 @@ from .datasets import *
 from .Binning import *
 from .plot_histogram import plot_histogram
 from .scatter_2d import scatter_2d
+from .coordinates_util import *
+from .PlotStuff import LineSpec, PointSpec
