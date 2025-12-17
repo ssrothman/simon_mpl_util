@@ -26,9 +26,15 @@ class NanoEventsDataset(AbstractDataset):
         #suppress warnings
         NanoAODSchema.warn_missing_crossrefs = False
 
+        import coffea
+        version = coffea._version.version_tuple
+        if version[0] >= 2025 and version[1] >= 11 and version[2] >= 0:
+            options['mode'] = 'virtual'
+        else:
+            options['delayed'] = False
+
         self._events = NanoEventsFactory.from_root(
             fname,
-            delayed=False,
             **options 
         ).events()
     
@@ -41,9 +47,9 @@ class NanoEventsDataset(AbstractDataset):
             raise ValueError("NanoEventsDataset.get_column: column_name '%s' contains '.'! Instead use collection_name argument."%(column_name))
         
         if collection_name is not None:
-            return self._events[collection_name][column_name]
+            return ak.materialize(self._events[collection_name][column_name])
         else:
-            return self._events[column_name]
+            return ak.materialize(self._events[column_name])
     
     def get_aknum_column(self, column_name):
         return ak.to_numpy(ak.num(self._events[column_name]))
