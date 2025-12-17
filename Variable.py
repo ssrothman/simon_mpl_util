@@ -422,8 +422,6 @@ class RelativeResolutionVariable(AbstractVariable):
         self.gen.set_collection_name(collection_name)
         self.reco.set_collection_name(collection_name)
 
-#utility variable to compute 3D magnitude from 3 component variables
-#not actually any new functionality 
 class Magnitude3dVariable(AbstractVariable):
     def __init__(self, xvar, yvar, zvar):
         import numpy as np
@@ -470,6 +468,44 @@ class Magnitude3dVariable(AbstractVariable):
         self.xvar.set_collection_name(collection_name)
         self.yvar.set_collection_name(collection_name)
         self.zvar.set_collection_name(collection_name)
+
+class Magnitude2dVariable(AbstractVariable):
+    def __init__(self, xvar, yvar):
+        import numpy as np
+
+        self.xvar = xvar
+        self.yvar = yvar
+
+        self.x2var = UFuncVariable(self.xvar, np.square)
+        self.y2var = UFuncVariable(self.yvar, np.square)
+
+        self.r2var = SumVariable(self.x2var, self.y2var)
+        self.rvar = UFuncVariable(self.r2var, np.sqrt)
+    
+    @property
+    def columns(self):
+        return list(set(
+            self.xvar.columns +
+            self.yvar.columns
+        ))  
+    
+    def evaluate(self, dataset):
+        return self.rvar.evaluate(dataset)
+    
+    @property
+    def key(self):
+        return "sqrt(%s^2 + %s^2)"%(self.xvar.key, self.yvar.key)
+
+    def __eq__(self, other):
+        if type(other) is not Magnitude3dVariable:
+            return False
+        return (self.xvar == other.xvar and
+                self.yvar == other.yvar)
+
+    def set_collection_name(self, collection_name):
+        self.rvar.set_collection_name(collection_name)
+        self.xvar.set_collection_name(collection_name)
+        self.yvar.set_collection_name(collection_name)
 
 class Distance3dVariable(AbstractVariable):
     def __init__(self, x1var, y1var, z1var, x2var, y2var, z2var):
