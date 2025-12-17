@@ -88,8 +88,13 @@ class BasicVariable(AbstractVariable):
         self._collection_name = collection_name
 
 class ConcatVariable(AbstractVariable):
-    def __init__(self, *vars):
+    def __init__(self, *vars, keyvar=None):
         self.vars_ = vars
+        if keyvar is None:
+            print("WARNING: ConcatVariable without key! Automatic labels will fail")
+            self._keyvar = BasicVariable("None")
+        else:
+            self._keyvar = keyvar
 
     @staticmethod
     def build_for_collections(var : AbstractVariable, collections_l : List[str]):
@@ -98,8 +103,8 @@ class ConcatVariable(AbstractVariable):
             v = copy.deepcopy(var)
             v.set_collection_name(coll)
             vars.append(v)
-        result = ConcatVariable(*vars)
-        result.override_label(var.label)
+
+        result = ConcatVariable(*vars, keyvar=var)
         return result
 
     @property
@@ -120,23 +125,13 @@ class ConcatVariable(AbstractVariable):
     
     @property
     def key(self):
-        keys = []
-        for var in self.vars_:
-            keys.append(var.key)
-        return "Concat(%s)"%("_".join(keys))
+        return self._keyvar.key
     
     def __eq__(self, other):
         if type(other) is not ConcatVariable:
             return False
-        
-        if len(self.vars_) != len(other.vars_):
-            return False
-        
-        for i in range(len(self.vars_)):
-            if self.vars_[i] != other.vars_[i]:
-                return False
-        
-        return True
+
+        return self._keyvar == other._keyvar        
 
     def set_collection_name(self, collection_name):
         print("WARNING: overwriting collection name for all variables in ConcatVariable object")
