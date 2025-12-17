@@ -30,6 +30,7 @@ def scatter_2d(varX_ : Union[AbstractVariable, List[AbstractVariable]],
                ps : float = 1.0,
                output_path: Union[str, None] = None,
                legend_loc : Union[str, int, tuple] ='best',
+               skip_empty : bool = True,
                add_stuff : Union[None, List[AbstractPlotSpec]] = None):
     
     if labels_ is None or len(labels_) == 1:
@@ -46,7 +47,7 @@ def scatter_2d(varX_ : Union[AbstractVariable, List[AbstractVariable]],
     add_cms_legend(ax, isdata)
 
     for vX, vY, c, d, l in zip(varX, varY, cut, dataset, labels):
-        _, _ = scatter_2d_(vX, vY, c, d, l, ax, ps=ps)
+        _, _ = scatter_2d_(vX, vY, c, d, l, ax, ps=ps, skip_empty=skip_empty)
 
     if add_stuff is not None:
         for stuff in add_stuff:
@@ -82,6 +83,7 @@ def scatter_2d_(varX: AbstractVariable, varY: AbstractVariable,
                 dataset: AbstractDataset,
                 label: str,
                 ax : plt.Axes,
+                skip_empty : bool = True,
                 ps : float = 1.0):
     
     needed_columns = list(set(varX.columns + varY.columns + cut.columns))
@@ -94,6 +96,9 @@ def scatter_2d_(varX: AbstractVariable, varY: AbstractVariable,
 
     xvals = ak.flatten(x[c], axis=None)
     yvals = ak.flatten(y[c], axis=None)
+
+    if len(xvals) == 0 and skip_empty:
+        return None, (xvals, yvals)
 
     return ax.scatter(
         xvals,
