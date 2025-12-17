@@ -22,7 +22,8 @@ class AbstractCut:
     
     #equality operator
     def __eq__(self, other):
-        raise NotImplementedError()
+        #error message says what subclass raised the error
+        raise NotImplementedError("Equality operator not implemented for subclass %s"%(type(self).__name__))
     
     def set_collection_name(self, collection_name):
         raise NotImplementedError()
@@ -227,9 +228,33 @@ class AndCuts(AbstractCut):
         for cut in self.cuts:
             cut.set_collection_name(collection_name)
 
+    def __eq__(self, other):
+        if type(other) is not AndCuts:
+            return False
+        
+        if len(self.cuts) != len(other.cuts):
+            return False
+        
+        for cut in self.cuts:
+            found = False
+            for other_cut in other.cuts:
+                if cut == other_cut:
+                    found = True
+                    break
+            if not found:
+                return False
+        
+        return True
+
 class ConcatCut(AbstractCut):
-    def __init__(self, *cuts):
+    def __init__(self, *cuts, keycut=None):
         self.cuts = cuts
+
+        if keycut is None:
+            self._keycut = NoCut()
+            print("Warning: ConcatCut has no keycut, so automatic labels will be blank")
+        else:
+            self._keycut = keycut
 
     @staticmethod
     def build_for_collections(cut : AbstractCut, collections_l : List[str], unique_cuts_l : Union[None, Sequence[AbstractCut]]=None):
@@ -245,7 +270,7 @@ class ConcatCut(AbstractCut):
             c.set_collection_name(coll)
             cuts.append(AndCuts(c, ucut))
             
-        return ConcatCut(*cuts)
+        return ConcatCut(*cuts, keycut=cut)
 
     @property
     def columns(self):
@@ -254,20 +279,21 @@ class ConcatCut(AbstractCut):
             cols += cut.columns
         return list(set(cols))
 
+    @property
+    def keycut(self):
+        return self._keycut
+
     def evaluate(self, dataset):
         masks = [cut.evaluate(dataset) for cut in self.cuts]
         return np.concatenate(masks)
 
     @property
     def key(self):
-        return "CONCAT(" + "_".join([cut.key for cut in self.cuts]) + ")"
+        return self._keycut.key
 
     @property
     def plottext(self):
-        result = self.cuts[0].plottext
-        for cut in self.cuts[1:]:
-            result += '\n' + cut.plottext
-        return result
+        return self._keycut.plottext
 
     def set_collection_name(self, collection_name):
         print("WARNING: overwriting collection name for all cuts in ConcatCut object")
@@ -277,14 +303,14 @@ class ConcatCut(AbstractCut):
     def __eq__(self, other):
         if type(other) is not ConcatCut:
             return False
-        if len(self.cuts) != len(other.cuts):
-            return False
-        for cut1, cut2 in zip(self.cuts, other.cuts):
-            if cut1 != cut2:
-                return False
-        return True
+        return self._keycut == other._keycut
 
 def common_cuts_(cut1, cut2):
+    if type(cut1) is ConcatCut:
+        cut1 = cut1.keycut
+    if type(cut2) is ConcatCut:
+        cut2 = cut2.keycut
+
     if type(cut1) is AndCuts and type(cut2) is not AndCuts:
         common = []
         for c1 in cut1.cuts:
