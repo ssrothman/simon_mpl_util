@@ -28,7 +28,13 @@ def add_cms_legend(ax, isdata: bool):
         hep.cms.label(ax=ax, data=False, 
                       label=config['cms_label'])
         
-def savefig(fig, path: str):
+def savefig(fig, path: str, mkdir : bool=True):
+    if mkdir:
+        import os
+        dirname = os.path.dirname(path)
+        if dirname != '':
+            os.makedirs(dirname, exist_ok=True)
+
     print("Saving figure %s" % (path))
     fig.savefig(path+'.png', dpi=300, bbox_inches='tight', format='png')
     fig.savefig(path+'.pdf', bbox_inches='tight', format='pdf')
@@ -53,12 +59,11 @@ def ensure_same_length(*args):
 
 def add_text(ax : plt.Axes, cut: Union[AbstractCut, List[AbstractCut]], extratext: Union[str, None]=None):
     ccut = common_cuts(cut)
-
     if type(ccut) is not NoCut:
         thetext = ccut.plottext
     else:
         thetext = ''
-
+        
     if extratext is not None:
         thetext = extratext + '\n' + thetext
 
