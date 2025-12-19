@@ -45,6 +45,30 @@ class AbstractVariable:
     def set_collection_name(self, collection_name):
         raise NotImplementedError()
 
+class ConstantVariable(AbstractVariable):
+    def __init__(self, value):
+        self._value = value
+
+    @property
+    def columns(self):
+        return []
+    
+    def evaluate(self, dataset):
+        return self._value
+    
+    @property
+    def key(self):
+        return "CONST(%s)"%(self._value)
+    
+    def __eq__(self, other):
+        if type(other) is not ConstantVariable:
+            return False
+        
+        return self._value == other._value
+    
+    def set_collection_name(self, collection_name):
+        pass
+
 class BasicVariable(AbstractVariable):
     def __init__(self, name, collection_name=None):
         self._name = name
