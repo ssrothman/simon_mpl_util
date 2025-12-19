@@ -22,7 +22,7 @@ from .variable.Variable import PrebinnedVariable
 from typing import List, Union
 
 class AbstractDataset:
-    def __init__(self):
+    def __init__(self, key : str):
         self._lumi = None
         self._xsec = None
         self._isMC = True
@@ -34,16 +34,13 @@ class AbstractDataset:
         self._label = None
         self._color = None
 
-        self._key = None
+        self._key = key
 
     def set_label(self, label):
         self._label = label
 
     def set_color(self, color):
         self._color = color
-
-    def set_key(self, key):
-        self._key = key
 
     @property
     def label(self):
@@ -194,8 +191,8 @@ class AbstractUnbinnedDataset(AbstractDataset):
         )
 
 class UnbinnedDatasetStack(AbstractUnbinnedDataset):
-    def __init__(self, datasets : list[AbstractUnbinnedDataset]):
-        super().__init__()
+    def __init__(self, key : str, datasets : list[AbstractUnbinnedDataset]):
+        super().__init__(key)
 
         self._datasets = datasets
 
@@ -320,8 +317,8 @@ class UnbinnedDatasetStack(AbstractUnbinnedDataset):
             ), self.H
     
 class NanoEventsDataset(AbstractUnbinnedDataset):
-    def __init__(self, fname, **options):
-        super().__init__()
+    def __init__(self, key, fname, **options):
+        super().__init__(key)
 
         #suppress warnings
         NanoAODSchema.warn_missing_crossrefs = False
@@ -359,8 +356,8 @@ class NanoEventsDataset(AbstractUnbinnedDataset):
         return len(self._events)
     
 class ParquetDataset(AbstractUnbinnedDataset):
-    def __init__(self, path):
-        super().__init__()
+    def __init__(self, key, path):
+        super().__init__(key)
 
         self._dataset = ds.dataset(path, format="parquet")
         
@@ -413,8 +410,8 @@ class ParquetDataset(AbstractUnbinnedDataset):
         return self._dataset.schema
     
 class PrebinnedDataset(AbstractDataset):
-    def __init__(self, values : np.ndarray, cov : np.ndarray, binning : ArbitraryBinning):
-        super().__init__()
+    def __init__(self, key : str, values : np.ndarray, cov : np.ndarray, binning : ArbitraryBinning):
+        super().__init__(key)
         self._values = values
         self._cov = cov
         self._binning = binning
