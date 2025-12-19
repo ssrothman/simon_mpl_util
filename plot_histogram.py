@@ -1,9 +1,12 @@
 import os
 from .SetupConfig import config, check_auto_logx
-from .Variable import AbstractVariable, variable_from_string, RatioVariable, DifferenceVariable, RelativeResolutionVariable
-from .Cut import AbstractCut, common_cuts, NoCut
-from .datasets import AbstractDataset, DatasetStack
-from .Binning import AbstractBinning, AutoBinning, DefaultBinning, AutoIntCategoryBinning
+from .variable.Variable import AbstractVariable, variable_from_string, RatioVariable, DifferenceVariable, RelativeResolutionVariable, PrebinnedVariable
+from .cut.Cut import AbstractCut, common_cuts, NoCut
+from .datasets import AbstractDataset, UnbinnedDatasetStack
+from .binning.Binning import AbstractBinning, AutoBinning, DefaultBinning, AutoIntCategoryBinning
+from .binning.PrebinnedBinning import PrebinnedBinning
+from .cut.PrebinnedCut import PrebinnedOperation, xlabel_from_binning
+from .AribtraryBinning import ArbitraryBinning
 
 from .histplot import simon_histplot
 
@@ -60,19 +63,21 @@ def plot_histogram(variable_: Union[AbstractVariable, List[AbstractVariable]],
     else:
         do_ratiopad = True
 
-    if type(binning) is AutoBinning or type(binning) is AutoIntCategoryBinning:
+    if isinstance(binning, AutoBinning) or isinstance(binning, AutoIntCategoryBinning):
         if logx:
             transform='log'
         else:
             transform=None
 
         axis = binning.build_auto_axis(variable, cut, dataset, transform=transform)
-    elif type(binning) is DefaultBinning:
+    elif isinstance(binning, DefaultBinning):
         axis = binning.build_default_axis(variable[0])
+    elif isinstance(binning, PrebinnedBinning):
+        axis = binning.build_prebinned_axis(dataset[0], cut[0])
     else:
         axis = binning.build_axis(variable[0])
 
-    is_stack = np.asarray([isinstance(d, DatasetStack) for d in dataset])
+    is_stack = np.asarray([isinstance(d, UnbinnedDatasetStack) for d in dataset])
     resolve_stacks = np.sum(is_stack) == 1
     
     if resolve_stacks:
@@ -141,7 +146,7 @@ def plot_histogram(variable_: Union[AbstractVariable, List[AbstractVariable]],
             density, ax_main, 
             style_from_dset or (not d.isMC),
             label=l,
-            fillbetween = 0 if (isinstance(d, DatasetStack) and resolve_stacks) else None
+            fillbetween = 0 if (isinstance(d, UnbinnedDatasetStack) and resolve_stacks) else None
         )
         artists.append(artist)
         Hs.append(H)
@@ -184,7 +189,11 @@ def plot_histogram(variable_: Union[AbstractVariable, List[AbstractVariable]],
             largest_nontrivial_ratio + pad
         )
 
-        ax_pad.set_xlabel(variable[0].label) # pyright: ignore[reportPossiblyUnboundVariable]
+        if isinstance(axis, ArbitraryBinning):
+            ax_pad.set_xlabel(xlabel_from_binning(axis)) # pyright: ignore[reportPossiblyUnboundVariable]
+        else:
+            ax_pad.set_xlabel(variable[0].label) # pyright: ignore[reportPossiblyUnboundVariable]
+
         if nolegend:
             ax_pad.set_ylabel("Ratio") # pyright: ignore[reportPossiblyUnboundVariable]
         else:
@@ -199,7 +208,10 @@ def plot_histogram(variable_: Union[AbstractVariable, List[AbstractVariable]],
                 ax_pad.set_ylabel('%s/MC' % denomlabel) # pyright: ignore[reportPossiblyUnboundVariable]
 
     else:
-        ax_main.set_xlabel(variable[0].label)
+        if isinstance(axis, ArbitraryBinning):
+            ax_main.set_xlabel(xlabel_from_binning(axis)) 
+        else:
+            ax_main.set_xlabel(variable[0].label) 
 
     if density:
         ax_main.set_ylabel('Density')
@@ -240,7 +252,7 @@ def plot_histogram(variable_: Union[AbstractVariable, List[AbstractVariable]],
                             fontsize=14) 
             ax_pad.grid(axis='x', which='major', linestyle='--', alpha=0.7) # pyright: ignore[reportPossiblyUnboundVariable]
         else:
-            ax_main.set_xticks(axis.edges) # pyright: ignore[reportAttributeAccessIssue]
+            ax_main.set_xticks(axis.edges) # pyright: ignore[reportArgumentType, reportAttributeAccessIssue]
             ax_main.set_xticks([], minor=True)
             ax_main.set_xticklabels([''] + ticklabels_strs, 
                             rotation=45, ha='right',

@@ -1,7 +1,7 @@
-from .SetupConfig import config, lookup_axis_label
+from ..SetupConfig import config, lookup_axis_label
 import copy
 from typing import List
-from .coordinates_util import xyz_to_eta_phi
+from ..coordinates_util import xyz_to_eta_phi
 
 def variable_from_string(name):
     if 'over' in name:
@@ -44,6 +44,24 @@ class AbstractVariable:
 
     def set_collection_name(self, collection_name):
         raise NotImplementedError()
+
+class PrebinnedVariable(AbstractVariable):
+    @property 
+    def columns(self):
+        return []
+    
+    def evaluate(self, dataset):
+        raise RuntimeError("PrebinnedVariable objects are just placeholders and cannot be evaluated. The actual evaluation happens in the cut object.")
+    
+    @property 
+    def key(self):
+        return "PREBINNED"
+    
+    def __eq__(self, other):
+        return isinstance(other, PrebinnedVariable)
+    
+    def set_collection_name(self, collection_name):
+        pass
 
 class ConstantVariable(AbstractVariable):
     def __init__(self, value):

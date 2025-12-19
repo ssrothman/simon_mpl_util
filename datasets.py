@@ -7,12 +7,19 @@ import pyarrow.dataset as ds
 
 import numpy as np
 
-from .Variable import AbstractVariable
-from .Cut import AbstractCut
+from .variable.Variable import AbstractVariable
+from .cut.Cut import AbstractCut
 from typing import Union, override
 import hist
 import matplotlib.axes
-from .histplot import simon_histplot, simon_histplot_ratio
+from .histplot import simon_histplot, simon_histplot_ratio, simon_histplot_arbitrary
+from .AribtraryBinning import ArbitraryBinning
+from .variable.Variable import ConstantVariable
+from .cut.Cut import NoCut
+from .AribtraryBinning import ArbitraryBinning
+from .variable.Variable import PrebinnedVariable
+
+from typing import List, Union
 
 class AbstractDataset:
     def __init__(self):
@@ -117,6 +124,7 @@ class AbstractDataset:
         else:
             self._weight = 1.0
 
+class AbstractUnbinnedDataset(AbstractDataset):
     def _fill_hist(self,
                   variable: AbstractVariable, 
                   cut: AbstractCut, 
@@ -126,7 +134,7 @@ class AbstractDataset:
         needed_columns = list(set(variable.columns + cut.columns + weight.columns))
         self.ensure_columns(needed_columns)
 
-        cut = cut.evaluate(self)
+        mask = cut.evaluate(self)
         val = variable.evaluate(self)
         wgt = weight.evaluate(self)
 
@@ -138,8 +146,8 @@ class AbstractDataset:
             storage=hist.storage.Weight()
         )
         self.H.fill(
-            ak.flatten(val[cut], axis=None), # pyright: ignore[reportArgumentType]
-            weight = self.weight * ak.flatten(wgt[cut], axis=None) # pyright: ignore[reportArgumentType]
+            ak.flatten(val[mask], axis=None), # pyright: ignore[reportArgumentType]
+            weight = self.weight * ak.flatten(wgt[mask], axis=None) # pyright: ignore[reportArgumentType]
         )
 
     def _plot_histogram(self,
@@ -185,8 +193,8 @@ class AbstractDataset:
             **mpl_kwargs
         )
 
-class DatasetStack(AbstractDataset):
-    def __init__(self, datasets : list[AbstractDataset]):
+class UnbinnedDatasetStack(AbstractUnbinnedDataset):
+    def __init__(self, datasets : list[AbstractUnbinnedDataset]):
         super().__init__()
 
         self._datasets = datasets
@@ -311,7 +319,7 @@ class DatasetStack(AbstractDataset):
                 **mpl_kwargs
             ), self.H
     
-class NanoEventsDataset(AbstractDataset):
+class NanoEventsDataset(AbstractUnbinnedDataset):
     def __init__(self, fname, **options):
         super().__init__()
 
@@ -350,7 +358,7 @@ class NanoEventsDataset(AbstractDataset):
     def num_rows(self):
         return len(self._events)
     
-class ParquetDataset(AbstractDataset):
+class ParquetDataset(AbstractUnbinnedDataset):
     def __init__(self, path):
         super().__init__()
 
@@ -403,3 +411,96 @@ class ParquetDataset(AbstractDataset):
     @property
     def schema(self):
         return self._dataset.schema
+    
+class PrebinnedDataset(AbstractDataset):
+    def __init__(self, values : np.ndarray, cov : np.ndarray, binning : ArbitraryBinning):
+        super().__init__()
+        self._values = values
+        self._cov = cov
+        self._binning = binning
+
+    @property
+    def values(self):
+        return self._values
+    
+    @property
+    def cov(self):
+        return self._cov
+
+    @property
+    def binning(self):
+        return self._binning
+
+    def project(self, axes : List[str]):
+        result = self._values
+        projbinning = self._binning
+        for ax in axes:
+            result, projbinning = projbinning.project_out(result, ax)
+
+        covresult = self._cov
+        b2 = self._binning
+        for ax in axes:
+            covresult, b2 = b2.project_out_cov2d(covresult, ax)
+
+        return result, covresult, projbinning
+
+    def slice(self, edges):
+        raise NotImplementedError("TO DO")
+        #return self._binning.get_slice(self._values, **edges)
+    
+    def _plot_histogram(self,
+                       variable: AbstractVariable, 
+                       cut: AbstractCut, 
+                       weight : AbstractVariable,
+                       axis : ArbitraryBinning,
+                       density: bool,
+                       ax : matplotlib.axes.Axes,
+                       own_style : bool,
+                       fillbetween : Union[float, None],
+                       **mpl_kwargs):
+
+        if not isinstance(weight, ConstantVariable):
+            raise RuntimeError("PrebinnedDataset._plot_histogram: Cannot apply event weights to prebinned dataset! The weights have to be baked into the histogram when it is built!")
+        
+        if not isinstance(variable, PrebinnedVariable):
+            raise TypeError("PrebinnedDataset._plot_histogram: variable must be a PrebinnedOperation")
+    
+        val, cov = cut.evaluate(self)
+        wgt = weight.evaluate(self) * self.weight
+
+        val = val * wgt
+        cov = cov * np.square(wgt)
+
+        self.H = val
+        self.covH = cov
+
+        if own_style:
+            mpl_kwargs['label'] = self.label
+            mpl_kwargs['color'] = self.color
+
+        return simon_histplot_arbitrary(
+            self.H, self.covH,
+            axis,
+            ax = ax,
+            density=density,
+            fillbetween = fillbetween,
+            **mpl_kwargs
+        ), (self.H, self.covH)
+    
+    def _plot_ratio(self,
+                    H1 : np.ndarray,
+                    H2 : np.ndarray,
+                    density : bool,
+                    ax : matplotlib.axes.Axes,
+                    own_style : bool,
+                    **mpl_kwargs):
+        
+        if own_style:
+            mpl_kwargs['color'] = self.color
+
+        return simon_histplot_ratio(
+            H1, H2,
+            ax = ax,
+            density=density,
+            **mpl_kwargs
+        )

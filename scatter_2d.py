@@ -1,12 +1,13 @@
+import matplotlib.axes
 from .SetupConfig import config
-from .Variable import AbstractVariable, variable_from_string, RatioVariable, DifferenceVariable, RelativeResolutionVariable
-from .Cut import AbstractCut, common_cuts, NoCut
+from .variable.Variable import AbstractVariable, variable_from_string, RatioVariable, DifferenceVariable, RelativeResolutionVariable
+from .cut.Cut import AbstractCut, common_cuts, NoCut
 from .datasets import AbstractDataset
-from .Binning import AbstractBinning, AutoBinning, DefaultBinning
+from .binning.Binning import AbstractBinning, AutoBinning, DefaultBinning
 
 from .histplot import simon_histplot
 
-from .util import setup_canvas, add_cms_legend, savefig, ensure_same_length, add_text, draw_legend
+from .util import setup_canvas, add_cms_legend, savefig, ensure_same_length, add_text, draw_legend, make_oneax
 from .place_text import place_text
 from .PlotStuff import AbstractPlotSpec
 
@@ -43,7 +44,8 @@ def scatter_2d(varX_ : Union[AbstractVariable, List[AbstractVariable]],
 
     varX, varY, cut, dataset, labels = ensure_same_length(varX_, varY_, cut_, dataset_, labels_)
 
-    fig, ax = setup_canvas()
+    fig = setup_canvas()
+    ax = make_oneax(fig)
     add_cms_legend(ax, isdata)
 
     for vX, vY, c, d, l in zip(varX, varY, cut, dataset, labels):
@@ -82,7 +84,7 @@ def scatter_2d_(varX: AbstractVariable, varY: AbstractVariable,
                 cut: AbstractCut, 
                 dataset: AbstractDataset,
                 label: str,
-                ax : plt.Axes,
+                ax : matplotlib.axes.Axes,
                 skip_empty : bool = True,
                 ps : float = 1.0):
     
@@ -94,8 +96,8 @@ def scatter_2d_(varX: AbstractVariable, varY: AbstractVariable,
     y = varY.evaluate(dataset)
     c = cut.evaluate(dataset)
 
-    xvals = ak.flatten(x[c], axis=None)
-    yvals = ak.flatten(y[c], axis=None)
+    xvals = ak.flatten(x[c], axis=None) # pyright: ignore[reportArgumentType]
+    yvals = ak.flatten(y[c], axis=None) # pyright: ignore[reportArgumentType]
 
     if len(xvals) == 0 and skip_empty:
         return None, (xvals, yvals)

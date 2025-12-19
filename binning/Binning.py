@@ -1,12 +1,14 @@
-from .SetupConfig import config, lookup_axis_label
+from ..SetupConfig import config, lookup_axis_label
 import hist
 import awkward as ak
 import numpy as np
 
-from .Variable import AbstractVariable
-from .Cut import AbstractCut
-from .datasets import AbstractDataset
+from ..variable.Variable import AbstractVariable
+from ..cut.Cut import AbstractCut
+from ..datasets import AbstractDataset
 from typing import Union, List
+from ..AribtraryBinning import ArbitraryBinning
+from ..cut.PrebinnedCut import PrebinnedOperation
 
 def transform_from_string(str : Union[str, None]) -> Union[hist.axis.transform.AxisTransform, None]:
     if str is None or str.lower() == "none":
@@ -26,6 +28,11 @@ class AbstractBinning:
                         cuts: List[AbstractCut], 
                         datasets: List[AbstractDataset], 
                         transform: Union[str, None]=None) -> hist.axis.AxesMixin:
+        raise NotImplementedError()
+
+    def build_prebinned_axis(self, 
+                             dataset : AbstractDataset,
+                             cut : PrebinnedOperation) -> ArbitraryBinning:
         raise NotImplementedError()
 
 class AutoIntCategoryBinning(AbstractBinning):

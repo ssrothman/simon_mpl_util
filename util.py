@@ -11,7 +11,7 @@ import mplhep as hep
 from .SetupConfig import config
 
 from typing import Union, List
-from .Cut import AbstractCut, common_cuts, NoCut
+from .cut.Cut import AbstractCut, common_cuts, NoCut
 from .place_text import place_text
 
 hep.style.use(hep.style.CMS)
