@@ -73,6 +73,7 @@ def simon_histplot_arbitrary(vals : np.ndarray, cov : np.ndarray,
                              binning : ArbitraryBinning, 
                              ax=None, density=False, fillbetween = None, **kwargs):
     
+    vals = vals.copy()
     errs = np.sqrt(np.diag(cov))
 
     if binning.Nax == 1:
@@ -114,6 +115,7 @@ def _simon_histplot_ratio(vals_num, errs_num,
                           edges, centers, widths,
                           ax=None, 
                           density=False, pulls=False, **kwargs):
+    
     if density:
         Nnum = np.sum(vals_num)
         Ndenom = np.sum(vals_denom)
@@ -150,6 +152,9 @@ def simon_histplot_ratio_arbitrary(num, denom,
                                    density=False, pulls=False, **kwargs):
     vals_num, cov_num = num
     vals_denom, cov_denom = denom
+
+    vals_num = vals_num.copy()
+    vals_denom = vals_denom.copy()
     
     errs_num = np.sqrt(np.diag(cov_num))
     errs_denom = np.sqrt(np.diag(cov_denom))
