@@ -126,14 +126,16 @@ def simon_histplot_ratio(Hnum, Hdenom, ax=None,
     vals_denom /= widths
     errs_denom /= widths
 
-    ratio = vals_num / vals_denom
-    ratio_err = np.sqrt(
-            np.square(errs_num/vals_num) + np.square(errs_denom/vals_denom)
-    ) * ratio
+    with np.errstate(invalid='ignore'): #ignore warnings from 0/0 operations. These return NaN, which are handled correctly downstream
+        ratio = vals_num / vals_denom
+
+        ratio_err = np.sqrt(
+                np.square(errs_num/vals_num) + np.square(errs_denom/vals_denom)
+        ) * ratio
 
     if pulls:
         ratio = ratio-1
         ratio = ratio/ratio_err
         ratio_err = np.ones_like(ratio)
 
-    return _call_errorbar(ax, centers, ratio, widths/2, ratio_err, **kwargs)
+    return _call_errorbar(ax, centers, ratio, widths/2, ratio_err, **kwargs), ratio, ratio_err
