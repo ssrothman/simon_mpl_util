@@ -109,6 +109,66 @@ def simon_histplot(H, ax=None, density=False, fillbetween = None, **kwargs):
     return _simon_histplot(vals, errs, edges, centers, widths,
                            ax=ax, density=density, fillbetween=fillbetween, **kwargs)
 
+def _simon_histplot_ratio(vals_num, errs_num,
+                          vals_denom, errs_denom,
+                          edges, centers, widths,
+                          ax=None, 
+                          density=False, pulls=False, **kwargs):
+    if density:
+        Nnum = np.sum(vals_num)
+        Ndenom = np.sum(vals_denom)
+
+        errs_num /= Nnum
+        vals_num /= Nnum
+
+        errs_denom /= Ndenom
+        vals_denom /= Ndenom
+
+    vals_num /= widths
+    errs_num /= widths
+
+    vals_denom /= widths
+    errs_denom /= widths
+
+    with np.errstate(divide='ignore', invalid='ignore'): #ignore warnings from 0/0 operations. These return NaN, which are handled correctly downstream
+        ratio = vals_num / vals_denom
+
+        ratio_err = np.sqrt(
+                np.square(errs_num/vals_num) + np.square(errs_denom/vals_denom)
+        ) * ratio
+
+    if pulls:
+        print("PULLS")
+        ratio = ratio-1
+        ratio = ratio/ratio_err
+        ratio_err = np.ones_like(ratio)
+    
+    return _call_errorbar(ax, centers, ratio, widths/2, ratio_err, **kwargs), ratio, ratio_err
+
+def simon_histplot_ratio_arbitrary(num, denom,
+                                   binning : ArbitraryBinning,
+                                   ax=None,
+                                   density=False, pulls=False, **kwargs):
+    vals_num, cov_num = num
+    vals_denom, cov_denom = denom
+    
+    errs_num = np.sqrt(np.diag(cov_num))
+    errs_denom = np.sqrt(np.diag(cov_denom))
+
+    if binning.Nax == 1:
+        axname = binning.axis_names[0]
+        edges = binning.edges[axname]
+    else:
+        edges = np.arange(len(vals_num)+1)-0.5
+
+    centers = (edges[:-1] + edges[1:]) / 2
+    widths = edges[1:] - edges[:-1]
+
+    return _simon_histplot_ratio(vals_num, errs_num,
+                                 vals_denom, errs_denom,
+                                 edges, centers, widths,
+                                 ax=ax, density=density, pulls=pulls, **kwargs)
+
 def simon_histplot_ratio(Hnum, Hdenom, ax=None, 
                          density=False, pulls=False, **kwargs):
     
@@ -134,32 +194,7 @@ def simon_histplot_ratio(Hnum, Hdenom, ax=None,
     if type(Hnum.axes[0]) is hist.axis.Integer:
         centers -= 0.5
 
-    if density:
-        Nnum = np.sum(vals_num)
-        Ndenom = np.sum(vals_denom)
-
-        errs_num /= Nnum
-        vals_num /= Nnum
-
-        errs_denom /= Ndenom
-        vals_denom /= Ndenom
-
-    vals_num /= widths
-    errs_num /= widths
-
-    vals_denom /= widths
-    errs_denom /= widths
-
-    with np.errstate(divide='ignore', invalid='ignore'): #ignore warnings from 0/0 operations. These return NaN, which are handled correctly downstream
-        ratio = vals_num / vals_denom
-
-        ratio_err = np.sqrt(
-                np.square(errs_num/vals_num) + np.square(errs_denom/vals_denom)
-        ) * ratio
-
-    if pulls:
-        ratio = ratio-1
-        ratio = ratio/ratio_err
-        ratio_err = np.ones_like(ratio)
-
-    return _call_errorbar(ax, centers, ratio, widths/2, ratio_err, **kwargs), ratio, ratio_err
+    return _simon_histplot_ratio(vals_num, errs_num,
+                                 vals_denom, errs_denom,
+                                 edges, centers, widths,
+                                 ax=ax, density=density, pulls=pulls, **kwargs)

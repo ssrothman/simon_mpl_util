@@ -8,11 +8,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import mplhep as hep
 
-from .SetupConfig import config
+from .SetupConfig import config, lookup_axis_label
 
 from typing import Union, List
 from .cut.Cut import AbstractCut, common_cuts, NoCut
 from .place_text import place_text
+from .AribtraryBinning import ArbitraryBinning
 
 hep.style.use(hep.style.CMS)
 matplotlib.rcParams['savefig.dpi'] = 300
@@ -156,3 +157,17 @@ def all_same_key(things : List, skip : Union[int, None]=None):
             return False
         
     return True
+
+def strip_units(s: str) -> str:
+    if '[' in s and ']' in s:
+        start = s.index('[')
+        end = s.index(']')
+        return s[:start].strip() + s[end+1:].strip()
+    else:
+        return s.strip()
+    
+def xlabel_from_binning(binning : ArbitraryBinning) -> str:
+    if binning.Nax == 1:
+        return lookup_axis_label(binning.axis_names[0])
+    else:
+        return '@'.join([strip_units(lookup_axis_label(ax)) for ax in binning.axis_names]) + " bin index"

@@ -12,7 +12,7 @@ from .cut.Cut import AbstractCut
 from typing import Union, override
 import hist
 import matplotlib.axes
-from .histplot import simon_histplot, simon_histplot_ratio, simon_histplot_arbitrary
+from .histplot import simon_histplot, simon_histplot_ratio, simon_histplot_arbitrary, simon_histplot_ratio_arbitrary
 from .AribtraryBinning import ArbitraryBinning
 from .variable.Variable import ConstantVariable
 from .cut.Cut import NoCut
@@ -175,6 +175,7 @@ class AbstractUnbinnedDataset(AbstractDataset):
     def _plot_ratio(self,
                     H1 : hist.Hist,
                     H2 : hist.Hist,
+                    axis : hist.axis.AxesMixin,
                     density : bool,
                     ax : matplotlib.axes.Axes,
                     own_style : bool,
@@ -487,6 +488,7 @@ class PrebinnedDataset(AbstractDataset):
     def _plot_ratio(self,
                     H1 : np.ndarray,
                     H2 : np.ndarray,
+                    axis : ArbitraryBinning,
                     density : bool,
                     ax : matplotlib.axes.Axes,
                     own_style : bool,
@@ -495,9 +497,10 @@ class PrebinnedDataset(AbstractDataset):
         if own_style:
             mpl_kwargs['color'] = self.color
 
-        return simon_histplot_ratio(
+        return simon_histplot_ratio_arbitrary(
             H1, H2,
+            axis,
             ax = ax,
-            density=density,
+            density = density,
             **mpl_kwargs
         )

@@ -1,16 +1,16 @@
 import os
-from .SetupConfig import config, check_auto_logx
+from .SetupConfig import config, check_auto_logx, lookup_axis_label
 from .variable.Variable import AbstractVariable, variable_from_string, RatioVariable, DifferenceVariable, RelativeResolutionVariable, PrebinnedVariable
 from .cut.Cut import AbstractCut, common_cuts, NoCut
 from .datasets import AbstractDataset, UnbinnedDatasetStack
 from .binning.Binning import AbstractBinning, AutoBinning, DefaultBinning, AutoIntCategoryBinning
 from .binning.PrebinnedBinning import PrebinnedBinning
-from .cut.PrebinnedCut import PrebinnedOperation, xlabel_from_binning
+from .cut.PrebinnedCut import PrebinnedOperation
 from .AribtraryBinning import ArbitraryBinning
 
 from .histplot import simon_histplot
 
-from .util import setup_canvas, add_cms_legend, savefig, ensure_same_length, add_text, draw_legend, make_oneax, make_axes_withpad, get_artist_color, all_same_key
+from .util import setup_canvas, add_cms_legend, savefig, ensure_same_length, add_text, draw_legend, make_oneax, make_axes_withpad, get_artist_color, all_same_key, strip_units, xlabel_from_binning
 
 import hist
 import matplotlib.pyplot as plt
@@ -30,6 +30,7 @@ def plot_histogram(variable_: Union[AbstractVariable, List[AbstractVariable]],
                    density: bool = False,
                    logx: Union[bool, None] = None,
                    logy: bool = False,
+                   pulls : bool = False,
                    no_ratiopad : bool = False,
                    output_folder: Union[str, None] = None,
                    output_prefix: Union[str, None] = None):
@@ -44,8 +45,12 @@ def plot_histogram(variable_: Union[AbstractVariable, List[AbstractVariable]],
 
     variable, cut, weight, dataset, labels = ensure_same_length(variable_, cut_, weight_, dataset_, labels_)
 
-    if logx is None:
+    #resolve auto logx BEFORE building axis for unbinned variables
+    if logx is None and not isinstance(variable[0], PrebinnedVariable): 
+        print("Attempting to resolve logx automatically...")
         logx = check_auto_logx(variable[0].key)
+        #logx = check_auto_logx("const")
+        print("Auto-resolved logx =", logx)
 
     if (type(dataset_) is list and (len(dataset_) > 1) or len(dataset) == 1):
         style_from_dset = True
@@ -76,6 +81,15 @@ def plot_histogram(variable_: Union[AbstractVariable, List[AbstractVariable]],
         axis = binning.build_prebinned_axis(dataset[0], cut[0])
     else:
         axis = binning.build_axis(variable[0])
+
+    #resolve auto logx AFTER building axis for prebinned variables
+    if logx is None and isinstance(axis, ArbitraryBinning):
+        print("Attempting to resolve logx automatically...")
+        if axis.Nax == 1:
+            logx = check_auto_logx(axis.axis_names[0])
+        else:
+            logx = False
+        print("Auto-resolved logx =", logx)
 
     is_stack = np.asarray([isinstance(d, UnbinnedDatasetStack) for d in dataset])
     resolve_stacks = np.sum(is_stack) == 1
@@ -154,8 +168,14 @@ def plot_histogram(variable_: Union[AbstractVariable, List[AbstractVariable]],
     if do_ratiopad:
         Hnom = Hs[which_ref]
 
-        largest_nontrivial_ratio = 1.0
-        smallest_nontrivial_ratio = 1.0
+        if pulls:
+            largest_nontrivial_ratio = 0.0
+            smallest_nontrivial_ratio = 0.0
+        else:
+            largest_nontrivial_ratio = 1.0
+            smallest_nontrivial_ratio = 1.0
+
+        maxthreshold = 0.0
 
         for i, d in enumerate(dataset):
             if i == which_ref:
@@ -163,27 +183,35 @@ def plot_histogram(variable_: Union[AbstractVariable, List[AbstractVariable]],
 
             _, ratiovals, ratioerrs = d._plot_ratio(
                 Hnom, Hs[i],
+                axis,
                 density = density,
                 ax = ax_pad, # pyright: ignore[reportPossiblyUnboundVariable]
                 own_style = style_from_dset,
-                color = get_artist_color(artists[i])
+                color = get_artist_color(artists[i]),
+                pulls = pulls
             )
 
             ratiothreshold = np.nanpercentile(ratioerrs, config['ratiopad']['auto_ylim']['percentile']) 
             ratiothreshold = max(ratiothreshold, config['ratiopad']['auto_ylim']['min_threshold'])
 
             ratiomask = ratioerrs < ratiothreshold
+            if np.sum(ratiomask) == 0:
+                ratiothreshold = np.nanmin(ratioerrs) + 1e-6
+                ratiomask = ratioerrs < ratiothreshold
+
             largest_nontrivial_ratio = max(
                 largest_nontrivial_ratio,
-                np.max(ratiovals[ratiomask])
+                np.nanmax(ratiovals[ratiomask])
             )
 
             smallest_nontrivial_ratio = min(
                 smallest_nontrivial_ratio,
-                np.min(ratiovals[ratiomask])
+                np.nanmin(ratiovals[ratiomask])
             )
 
-        pad = config['ratiopad']['auto_ylim']['padding']
+            maxthreshold = max(maxthreshold, ratiothreshold)
+
+        pad = config['ratiopad']['auto_ylim']['padding'] + maxthreshold
         ax_pad.set_ylim( # pyright: ignore[reportPossiblyUnboundVariable]
             smallest_nontrivial_ratio - pad,
             largest_nontrivial_ratio + pad
@@ -194,18 +222,23 @@ def plot_histogram(variable_: Union[AbstractVariable, List[AbstractVariable]],
         else:
             ax_pad.set_xlabel(variable[0].label) # pyright: ignore[reportPossiblyUnboundVariable]
 
+        if pulls:
+            extra_ylabel = ' [pull]'
+        else:
+            extra_ylabel = ''
+
         if nolegend:
-            ax_pad.set_ylabel("Ratio") # pyright: ignore[reportPossiblyUnboundVariable]
+            ax_pad.set_ylabel("Ratio" + extra_ylabel) # pyright: ignore[reportPossiblyUnboundVariable]
         else:
             if isdata:
-                ax_pad.set_ylabel('Data/MC') # pyright: ignore[reportPossiblyUnboundVariable]
+                ax_pad.set_ylabel('Data/MC' + extra_ylabel) # pyright: ignore[reportPossiblyUnboundVariable]
             else:
                 if style_from_dset:
                     denomlabel = dataset[0].label
                 else:
                     denomlabel = labels[0]
 
-                ax_pad.set_ylabel('%s/MC' % denomlabel) # pyright: ignore[reportPossiblyUnboundVariable]
+                ax_pad.set_ylabel(('%s/MC' % denomlabel) + extra_ylabel) # pyright: ignore[reportPossiblyUnboundVariable]
 
     else:
         if isinstance(axis, ArbitraryBinning):
@@ -229,7 +262,13 @@ def plot_histogram(variable_: Union[AbstractVariable, List[AbstractVariable]],
         ax_main.axvline(0.0, color='k', linestyle='dashed')
 
     if do_ratiopad:
-        ax_pad.axhline(1.0, color='k', linestyle='dashed') # pyright: ignore[reportPossiblyUnboundVariable]
+        if pulls:
+            ax_pad.axhline(0.0, color='k', linestyle='dashed') # pyright: ignore[reportPossiblyUnboundVariable]
+            xmin, xmax = ax_pad.get_xlim() # pyright: ignore[reportPossiblyUnboundVariable]
+            ax_pad.fill_between([xmin, xmax], -1.0, 1.0, color='gray', alpha=0.3) # pyright: ignore[reportPossiblyUnboundVariable]
+            ax_pad.set_xlim(xmin, xmax) # pyright: ignore[reportPossiblyUnboundVariable]
+        else:
+            ax_pad.axhline(1.0, color='k', linestyle='dashed') # pyright: ignore[reportPossiblyUnboundVariable]
         ax_pad.grid(axis='y', which='major', linestyle='--', alpha=0.7) # pyright: ignore[reportPossiblyUnboundVariable]
 
     if type(binning) is AutoIntCategoryBinning:
@@ -258,6 +297,65 @@ def plot_histogram(variable_: Union[AbstractVariable, List[AbstractVariable]],
                             rotation=45, ha='right',
                             fontsize=14)
             ax_main.grid(axis='x', which='major', linestyle='--', alpha=0.7)
+    
+    elif type(axis) is ArbitraryBinning:
+        if axis.Nax == 2:
+            blocks = axis.get_blocks([axis.axis_names[0]])
+            all_contiguous = True
+            for block in blocks:
+                if not isinstance(block['slice'], slice):
+                    all_contiguous = False
+                    print(type(block['slice']))
+                    break
+            
+            if all_contiguous:
+                major_ticks = []
+                for block in blocks:
+                    start = block['slice'].start 
+                    major_ticks.append(start - 0.5)
+                major_ticks.append(axis.total_size - 0.5)
+                major_ticks = np.asarray(major_ticks)
+                print(major_ticks)
+                ax_main.set_xticks(major_ticks, minor=False, labels=['']*len(major_ticks))
+                ax_main.set_xticks(np.arange(axis.total_size + 1) - 0.5, minor=True)
+                ax_main.grid(axis='x', which='major', linestyle='--', alpha=0.9)
+
+                if do_ratiopad:
+                    ax_pad.grid(axis='x', which='major', linestyle='--', alpha=0.9) # pyright: ignore[reportPossiblyUnboundVariable]
+                    bottom_ax = ax_pad # pyright: ignore[reportPossiblyUnboundVariable]
+                    
+                    ax2 = ax_pad.twiny()# pyright: ignore[reportPossiblyUnboundVariable]
+                else:
+                    ax2 = ax_main.twiny()
+                    bottom_ax = ax_main
+
+                bottom_ax.tick_params(direction='inout', which='major', axis='x', length=50) 
+
+                ax2.spines['top'].set_visible(False)
+                ax2.spines['bottom'].set_visible(False)
+                ax2.spines['top'].set_position(('axes', 0.0))
+                ax2.set_xlim(ax_main.get_xlim())
+                major_tick_centers = (major_ticks[:-1] + major_ticks[1:]) / 2
+                major_tick_labels = []
+                axname = lookup_axis_label(axis.axis_names[0])
+                axname = strip_units(axname)
+                for block in blocks:
+                    low = block['edges'][axis.axis_names[0]][0]
+                    high = block['edges'][axis.axis_names[0]][1]
+                    if low == -np.inf:
+                        major_tick_labels.append('%s$ \\leq %0.3g$' % (axname, high))
+                    elif high == np.inf:
+                        major_tick_labels.append('$%0.3g < $%s' % (low, axname))
+                    else:
+                        major_tick_labels.append('$%0.3g < $%s$ \\leq %0.3g$' % (low, axname, high))
+
+                ax2.set_xticks(major_tick_centers, minor=False,
+                               labels=major_tick_labels) #dummy labels
+                ax2.set_xticks([], minor=True)
+                ax2.tick_params(axis='x', direction='in', which='both',
+                                labelbottom=True, labeltop=False,
+                                labelsize=14,
+                                length=0)
 
     add_text(ax_main, cut, extratext)
 
@@ -293,6 +391,9 @@ def plot_histogram(variable_: Union[AbstractVariable, List[AbstractVariable]],
             output_path += '_DENSITY'
         if no_ratiopad:
             output_path += '_NORATIO'
+
+        if pulls and do_ratiopad:
+            output_path += '_PULLS'
 
         savefig(fig, output_path)
     else:

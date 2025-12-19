@@ -5,12 +5,6 @@ from ..AribtraryBinning import ArbitraryBinning
 from ..SetupConfig import lookup_axis_label
 import numpy as np
 
-def xlabel_from_binning(binning : ArbitraryBinning) -> str:
-    if binning.Nax == 1:
-        return lookup_axis_label(binning.axis_names[0])
-    else:
-        return '@'.join([lookup_axis_label(ax) for ax in binning.axis_names]) + " bin index"
-
 class PrebinnedOperation(AbstractCut):
     @property
     def columns(self):
