@@ -1,6 +1,24 @@
 from simon_mpl_util.plotting.util.config import lookup_axis_label
 
 class AbstractVariable:
+    def override_centerline(self, centerline):
+        self._centerline = centerline
+
+    @property
+    def _natural_centerline(self):
+        raise NotImplementedError()
+    
+    @property
+    def centerline(self):
+        if hasattr(self, '_centerline'):
+            return self._centerline
+        else:
+            return self._natural_centerline
+
+    @property
+    def prebinned(self) -> bool:
+        raise NotImplementedError()
+
     @property
     def columns(self):
         raise NotImplementedError()

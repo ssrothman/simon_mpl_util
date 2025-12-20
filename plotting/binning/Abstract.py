@@ -26,3 +26,14 @@ class AbstractBinning:
                              cut : PrebinnedOperation) -> ArbitraryBinning:
         raise NotImplementedError()
 
+    @property
+    def kind(self) -> str:
+        raise NotImplementedError()
+
+    @property
+    def has_custom_labels(self) -> bool:
+        raise NotImplementedError
+    
+    @property
+    def label_lookup(self) -> dict[str, str]:
+        raise NotImplementedError()

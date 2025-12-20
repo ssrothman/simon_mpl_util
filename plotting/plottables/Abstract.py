@@ -12,8 +12,6 @@ from typing import List, Union
 import hist
 import matplotlib.axes
 
-
-
 class AbstractDataset:
     def __init__(self, key : str):
         self._lumi = None
@@ -28,6 +26,10 @@ class AbstractDataset:
         self._color = None
 
         self._key = key
+
+    @property
+    def is_stack(self) -> bool:
+        raise NotImplementedError()
 
     def set_label(self, label):
         self._label = label

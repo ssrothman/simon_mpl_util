@@ -13,6 +13,14 @@ class RelativeResolutionVariable(AbstractVariable):
             self.reco = variable_from_string(reco)
 
     @property
+    def _natural_centerline(self):
+        return 0.0
+    
+    @property
+    def prebinned(self) -> bool:
+        return False
+
+    @property
     def columns(self):
         return list(set(self.gen.columns + self.reco.columns))
     
@@ -53,6 +61,14 @@ class Magnitude3dVariable(AbstractVariable):
 
         self.rvar = UFuncVariable(self.r2var, np.sqrt)
     
+    @property
+    def _natural_centerline(self):
+        return None
+    
+    @property
+    def prebinned(self) -> bool:
+        return False
+
     @property
     def columns(self):
         return list(set(
@@ -95,6 +111,14 @@ class Magnitude2dVariable(AbstractVariable):
         self.rvar = UFuncVariable(self.r2var, np.sqrt)
     
     @property
+    def _natural_centerline(self):
+        return None
+    
+    @property
+    def prebinned(self) -> bool:
+        return False
+    
+    @property
     def columns(self):
         return list(set(
             self.xvar.columns +
@@ -133,6 +157,14 @@ class Distance3dVariable(AbstractVariable):
             self.dzvar
         )
 
+    @property
+    def _natural_centerline(self):
+        return None
+    
+    @property
+    def prebinned(self) -> bool:
+        return False
+    
     @property
     def columns(self):
         return list(set(
@@ -174,6 +206,14 @@ class EtaFromXYZVariable(AbstractVariable):
         self._y = y
         self._z = z
 
+    @property
+    def _natural_centerline(self):
+        return None
+    
+    @property
+    def prebinned(self) -> bool:
+        return False
+    
     @property 
     def columns(self):
         return list(set(self._x.columns + self._y.columns + self._z.columns))
@@ -208,6 +248,14 @@ class PhiFromXYZVariable(AbstractVariable):
         self._y = y
         self._z = z
 
+    @property
+    def _natural_centerline(self):
+        return None
+    
+    @property
+    def prebinned(self) -> bool:
+        return False
+    
     @property 
     def columns(self):
         return list(set(self._x.columns + self._y.columns + self._z.columns))

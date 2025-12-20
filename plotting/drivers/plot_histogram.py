@@ -1,10 +1,10 @@
 from simon_mpl_util.plotting.util.config import config, check_auto_logx
-from simon_mpl_util.plotting.variable.Variable import AbstractVariable, RatioVariable, DifferenceVariable, PrebinnedVariable
-from simon_mpl_util.plotting.variable.CompositeVariable import RelativeResolutionVariable
-from simon_mpl_util.plotting.cut.Cut import AbstractCut
-from simon_mpl_util.plotting.plottables.Datasets import AbstractDataset, UnbinnedDatasetStack
-from simon_mpl_util.plotting.binning.Binning import AbstractBinning, AutoBinning, DefaultBinning, AutoIntCategoryBinning
-from simon_mpl_util.plotting.binning.PrebinnedBinning import PrebinnedBinning
+
+from simon_mpl_util.plotting.variable.Abstract import AbstractVariable
+from simon_mpl_util.plotting.cut.Abstract import AbstractCut
+from simon_mpl_util.plotting.plottables.Abstract import AbstractDataset
+from simon_mpl_util.plotting.binning.Binning import AbstractBinning
+
 from simon_mpl_util.plotting.util.common import setup_canvas, add_cms_legend, savefig, add_text, draw_legend, make_oneax, make_axes_withpad, get_artist_color, make_fancy_prebinned_labels, label_from_binning
 
 from simon_mpl_util.util.AribtraryBinning import ArbitraryBinning
@@ -43,7 +43,7 @@ def plot_histogram(variable_: Union[AbstractVariable, List[AbstractVariable]],
     variable, cut, weight, dataset, labels = ensure_same_length(variable_, cut_, weight_, dataset_, labels_)
 
     #resolve auto logx BEFORE building axis for unbinned variables
-    if logx is None and not isinstance(variable[0], PrebinnedVariable): 
+    if logx is None and not variable[0].prebinned:
         logx = check_auto_logx(variable[0].key)
 
     if (type(dataset_) is list and (len(dataset_) > 1) or len(dataset) == 1):
@@ -62,19 +62,21 @@ def plot_histogram(variable_: Union[AbstractVariable, List[AbstractVariable]],
     else:
         do_ratiopad = True
 
-    if isinstance(binning, AutoBinning) or isinstance(binning, AutoIntCategoryBinning):
+    if binning.kind == 'auto':
         if logx:
             transform='log'
         else:
             transform=None
 
         axis = binning.build_auto_axis(variable, cut, dataset, transform=transform)
-    elif isinstance(binning, DefaultBinning):
+    elif binning.kind == 'default':
         axis = binning.build_default_axis(variable[0])
-    elif isinstance(binning, PrebinnedBinning):
+    elif binning.kind == 'prebinned':
         axis = binning.build_prebinned_axis(dataset[0], cut[0])
-    else:
+    elif binning.kind == 'regular':
         axis = binning.build_axis(variable[0])
+    else:
+        raise RuntimeError("Unknown binning kind: %s" % binning.kind)
 
     #resolve auto logx AFTER building axis for prebinned variables
     if logx is None and isinstance(axis, ArbitraryBinning):
@@ -88,7 +90,7 @@ def plot_histogram(variable_: Union[AbstractVariable, List[AbstractVariable]],
     else:
         the_xlabel = variable[0].label 
 
-    is_stack = np.asarray([isinstance(d, UnbinnedDatasetStack) for d in dataset])
+    is_stack = np.asarray([d.is_stack for d in dataset])
     resolve_stacks = np.sum(is_stack) == 1
     
     if resolve_stacks:
@@ -157,7 +159,7 @@ def plot_histogram(variable_: Union[AbstractVariable, List[AbstractVariable]],
             density, ax_main, 
             style_from_dset or (not d.isMC),
             label=l,
-            fillbetween = 0 if (isinstance(d, UnbinnedDatasetStack) and resolve_stacks) else None
+            fillbetween = 0 if (d.is_stack and resolve_stacks) else None
         )
         artists.append(artist)
         Hs.append(H)
@@ -252,10 +254,8 @@ def plot_histogram(variable_: Union[AbstractVariable, List[AbstractVariable]],
     if logy:
         ax_main.set_yscale('log')
 
-    if type(variable[0]) is RatioVariable:
-        ax_main.axvline(1.0, color='k', linestyle='dashed')
-    elif type(variable[0]) is DifferenceVariable or type(variable[0]) is RelativeResolutionVariable:
-        ax_main.axvline(0.0, color='k', linestyle='dashed')
+    if variable[0].centerline is not None:
+        ax_main.axvline(variable[0].centerline, color='k', linestyle='dashed')
 
     if do_ratiopad:
         if pulls:
@@ -267,7 +267,7 @@ def plot_histogram(variable_: Union[AbstractVariable, List[AbstractVariable]],
             ax_pad.axhline(1.0, color='k', linestyle='dashed') # pyright: ignore[reportPossiblyUnboundVariable]
         ax_pad.grid(axis='y', which='major', linestyle='--', alpha=0.7) # pyright: ignore[reportPossiblyUnboundVariable]
 
-    if type(binning) is AutoIntCategoryBinning:
+    if binning.has_custom_labels:
         # get category label [pylance is confused :(]
         ticklabels_ints = axis.value(axis.edges[:-1]) # pyright: ignore[reportAttributeAccessIssue] 
         ticklabels_strs = []

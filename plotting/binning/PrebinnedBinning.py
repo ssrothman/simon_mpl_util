@@ -5,6 +5,14 @@ from simon_mpl_util.plotting.cut.PrebinnedCut import PrebinnedOperation
 from simon_mpl_util.util.AribtraryBinning import ArbitraryBinning
 
 class PrebinnedBinning(AbstractBinning):
+    @property
+    def kind(self) -> str:
+        return "prebinned"
+    
+    @property
+    def has_custom_labels(self) -> bool:
+        return False
+    
     def build_prebinned_axis(self,
                              dataset : AbstractDataset,
                              cut : PrebinnedOperation) -> ArbitraryBinning:

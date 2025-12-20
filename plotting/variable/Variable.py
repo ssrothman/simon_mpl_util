@@ -16,9 +16,20 @@ def variable_from_string(name):
         return BasicVariable(name)
 
 class PrebinnedVariable(AbstractVariable):
+    def __init__(self):
+        pass #stateless
+    
+    @property
+    def _natural_centerline(self):
+        return None
+    
     @property 
     def columns(self):
         return []
+    
+    @property
+    def prebinned(self) -> bool:
+        return True
     
     def evaluate(self, dataset):
         raise RuntimeError("PrebinnedVariable objects are just placeholders and cannot be evaluated. The actual evaluation happens in the cut object.")
@@ -37,6 +48,14 @@ class ConstantVariable(AbstractVariable):
     def __init__(self, value):
         self._value = value
 
+    @property
+    def _natural_centerline(self):
+        return None
+    
+    @property
+    def prebinned(self) -> bool:
+        return False
+    
     @property
     def columns(self):
         return []
@@ -70,6 +89,10 @@ class BasicVariable(AbstractVariable):
             raise ValueError("Variable name '%s' contains '.' but collection_name is also specified"%(name))
 
     @property
+    def _natural_centerline(self):
+        return None
+    
+    @property
     def columns(self):
         if self._collection_name is None:
             return [self._name]
@@ -78,6 +101,10 @@ class BasicVariable(AbstractVariable):
 
     def evaluate(self, dataset):
         return dataset.get_column(self._name, self._collection_name)
+    
+    @property
+    def prebinned(self) -> bool:
+        return False
     
     @property
     def key(self):
@@ -108,6 +135,14 @@ class ConcatVariable(AbstractVariable):
         else:
             self._keyvar = keyvar
 
+    @property
+    def _natural_centerline(self):
+        return self.vars_[0]._natural_centerline
+    
+    @property
+    def prebinned(self) -> bool:
+        return False
+    
     @staticmethod
     def build_for_collections(var : AbstractVariable, collections_l : List[str]):
         vars = []
@@ -157,9 +192,17 @@ class AkNumVariable(AbstractVariable):
         self.name = name
 
     @property
+    def _natural_centerline(self):
+        return None
+    
+    @property
     def columns(self):
         return [self.name]
 
+    @property
+    def prebinned(self) -> bool:
+        return False
+    
     def evaluate(self, dataset):
         return dataset.get_aknum_column(self.name)
     
@@ -188,6 +231,14 @@ class RatioVariable(AbstractVariable):
         else:
             self.denom = denom
 
+    @property
+    def _natural_centerline(self):
+        return 1.0
+    
+    @property
+    def prebinned(self) -> bool:
+        return False
+    
     @property
     def columns(self):
         return list(set(self.num.columns + self.denom.columns))
@@ -222,6 +273,14 @@ class ProductVariable(AbstractVariable):
             self.var2 = var2
 
     @property
+    def _natural_centerline(self):
+        return None
+    
+    @property
+    def prebinned(self) -> bool:
+        return False
+    
+    @property
     def columns(self):
         return self.var1.columns + self.var2.columns
 
@@ -253,6 +312,14 @@ class DifferenceVariable(AbstractVariable):
             self.reco = variable_from_string(reco)
 
     @property
+    def _natural_centerline(self):
+        return 0.0
+    
+    @property
+    def prebinned(self) -> bool:
+        return False
+    
+    @property
     def columns(self):
         return list(set(self.gen.columns + self.reco.columns))
 
@@ -282,6 +349,14 @@ class SumVariable(AbstractVariable):
         if type(x2) is str:
             self.x2 = variable_from_string(x2)
 
+    @property
+    def _natural_centerline(self):
+        return None
+    
+    @property
+    def prebinned(self) -> bool:
+        return False
+    
     @property
     def columns(self):
         return list(set(self.x1.columns + self.x2.columns))
@@ -321,6 +396,14 @@ class CorrectionlibVariable(AbstractVariable):
         self.csetkey = key
 
     @property
+    def _natural_centerline(self):
+        return None
+    
+    @property
+    def prebinned(self) -> bool:
+        return False
+    
+    @property
     def columns(self):
         cols = []
         for var in self.var_l:
@@ -352,6 +435,14 @@ class UFuncVariable(AbstractVariable):
         self.ufunc = ufunc
 
     @property
+    def _natural_centerline(self):
+        return None
+    
+    @property
+    def prebinned(self) -> bool:
+        return False
+    
+    @property
     def columns(self):
         return self.var.columns
 
@@ -382,6 +473,14 @@ class RateVariable(AbstractVariable):
         else:
             self.wrt = wrt
 
+    @property
+    def _natural_centerline(self):
+        return None
+    
+    @property
+    def prebinned(self) -> bool:
+        return False
+    
     @property
     def columns(self):
         return list(set(self.binaryfield.columns + self.wrt.columns))

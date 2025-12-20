@@ -27,6 +27,14 @@ class AutoIntCategoryBinning(AbstractBinning):
     def label_lookup(self) -> dict[str, str]:
         return self._label_lookup
 
+    @property
+    def has_custom_labels(self) -> bool:
+        return True
+    
+    @property
+    def kind(self) -> str:
+        return "auto"
+    
     def build_auto_axis(self, 
                         variables: List[AbstractVariable], 
                         cuts: List[AbstractCut], 
@@ -57,6 +65,14 @@ class AutoBinning(AbstractBinning):
         self._force_low = None
         self._force_high = None
 
+    @property
+    def has_custom_labels(self) -> bool:
+        return False
+    
+    @property
+    def kind(self) -> str:
+        return "auto"
+    
     def force_range(self, minval: Union[float, None], maxval: Union[float, None]):
         self._force_low = minval
         self._force_high = maxval
@@ -126,6 +142,14 @@ class DefaultBinning(AbstractBinning):
     def __init__(self):
         pass
 
+    @property
+    def has_custom_labels(self) -> bool:
+        return False
+    
+    @property
+    def kind(self) -> str:
+        return "default"
+    
     def build_default_axis(self, variable: AbstractVariable) -> hist.axis.AxesMixin:
         cfg = config['default_binnings'][variable.key]
         if cfg['type'] == 'regular':
@@ -152,6 +176,14 @@ class RegularBinning(AbstractBinning):
         else:
             self._transform = None
 
+    @property
+    def has_custom_labels(self) -> bool:
+        return False
+    
+    @property
+    def kind(self) -> str:
+        return "regular"
+    
     @property
     def nbins(self) -> int:
         return self._nbins
@@ -183,8 +215,16 @@ class ExplicitBinning(AbstractBinning):
         self._edges = edges
 
     @property
+    def has_custom_labels(self) -> bool:
+        return False
+    
+    @property
     def edges(self) -> List[Union[float, int]]:
         return self._edges
+    
+    @property
+    def kind(self) -> str:
+        return "regular"
     
     def build_axis(self, variable: AbstractVariable) -> hist.axis.AxesMixin:
         return hist.axis.Variable(

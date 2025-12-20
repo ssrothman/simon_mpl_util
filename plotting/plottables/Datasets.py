@@ -26,6 +26,10 @@ class UnbinnedDatasetStack(AbstractUnbinnedDataset):
 
         self._datasets = datasets
 
+    @property
+    def is_stack(self) -> bool:
+        return True
+
     def set_lumi(self, lumi):
         raise RuntimeError("DatasetStack.set_lumi: Cannot set lumi on DatasetStack!")
     
@@ -165,6 +169,10 @@ class NanoEventsDataset(AbstractUnbinnedDataset):
             **options 
         ).events()
     
+    @property
+    def is_stack(self) -> bool:
+        return False
+    
     def ensure_columns(self, columns):
         # NanoEvents loads all columns on demand, so nothing to do here
         pass
@@ -191,6 +199,10 @@ class ParquetDataset(AbstractUnbinnedDataset):
 
         self._dataset = ds.dataset(path, format="parquet")
         
+    @property
+    def is_stack(self) -> bool:
+        return False
+    
     def ensure_columns(self, columns):
         has_everything = True
         if hasattr(self, '_table'):
@@ -243,6 +255,10 @@ class PrebinnedDataset(AbstractPrebinnedDataset):
     def __init__(self, key : str, values : np.ndarray, cov : np.ndarray, binning : ArbitraryBinning):
         super().__init__(key, values, cov, binning)
 
+    @property
+    def is_stack(self) -> bool:
+        return False
+    
     def project(self, axes : List[str]):
         result = self._values
         projbinning = self._binning
