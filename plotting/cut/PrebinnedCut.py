@@ -1,4 +1,3 @@
-from simon_mpl_util.plotting.cut.Cut import AbstractCut
 from simon_mpl_util.plotting.plottables.Datasets import AbstractDataset, PrebinnedDataset
 from simon_mpl_util.plotting.util.config import lookup_axis_label
 
@@ -9,20 +8,8 @@ import numpy as np
 
 from typing import List
 
-class PrebinnedOperation(AbstractCut):
-    @property
-    def columns(self):
-        return []    
-    
-    def resulting_binning(self, binning : ArbitraryBinning) -> ArbitraryBinning:
-        if not hasattr(self, '_resulting_binning'):
-            self._resulting_binning = self._compute_resulting_binning(binning)
+from .Abstract import PrebinnedOperation
 
-        return self._resulting_binning
-        
-    def _compute_resulting_binning(self, binning : ArbitraryBinning) -> ArbitraryBinning:
-        raise NotImplementedError("PrebinnedOperation subclasses must implement compute_resulting_binning method")
-    
 class NoopOperation(PrebinnedOperation):
     @property
     def key(self):

@@ -1,4 +1,4 @@
-from .Binning import AbstractBinning
+from .Abstract import AbstractBinning
 from simon_mpl_util.plotting.plottables.Datasets import AbstractDataset, PrebinnedDataset
 from simon_mpl_util.plotting.cut.PrebinnedCut import PrebinnedOperation
 

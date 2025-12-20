@@ -1,8 +1,9 @@
 from simon_mpl_util.plotting.util.config import config, lookup_axis_label
-from simon_mpl_util.plotting.variable.Variable import AbstractVariable
-from simon_mpl_util.plotting.plottables.Datasets import AbstractDataset
-from simon_mpl_util.plotting.cut.Cut import AbstractCut
-from simon_mpl_util.plotting.cut.PrebinnedCut import PrebinnedOperation
+
+from simon_mpl_util.plotting.variable.Abstract import AbstractVariable
+from simon_mpl_util.plotting.plottables.Abstract import AbstractDataset
+from simon_mpl_util.plotting.cut.Abstract import AbstractCut, PrebinnedOperation
+from .Abstract import AbstractBinning
 
 from simon_mpl_util.util.AribtraryBinning import ArbitraryBinning
 
@@ -17,25 +18,6 @@ def transform_from_string(str : Union[str, None]) -> Union[hist.axis.transform.A
         return None
     else:
         return getattr(hist.axis.transform, str)
-
-class AbstractBinning:
-    def build_axis(self, variable : AbstractVariable) -> hist.axis.AxesMixin:
-        raise NotImplementedError()
-    
-    def build_default_axis(self, variable: AbstractVariable) -> hist.axis.AxesMixin:
-        raise NotImplementedError()
-    
-    def build_auto_axis(self, 
-                        variables: List[AbstractVariable], 
-                        cuts: List[AbstractCut], 
-                        datasets: List[AbstractDataset], 
-                        transform: Union[str, None]=None) -> hist.axis.AxesMixin:
-        raise NotImplementedError()
-
-    def build_prebinned_axis(self, 
-                             dataset : AbstractDataset,
-                             cut : PrebinnedOperation) -> ArbitraryBinning:
-        raise NotImplementedError()
 
 class AutoIntCategoryBinning(AbstractBinning):
     def __init__(self, label_lookup : dict[str, str] = {}):

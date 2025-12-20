@@ -1,8 +1,7 @@
-from .Cut import AbstractCut, NoCut, EqualsCut, TwoSidedCut, GreaterThanCut, LessThanCut, AndCuts, ConcatCut, common_cuts
-from .PrebinnedCut import PrebinnedOperation, NoopOperation, SliceOperation, ProjectionOperation, ProjectAndSliceOperation
+from .Cut import NoCut, EqualsCut, TwoSidedCut, GreaterThanCut, LessThanCut, AndCuts, ConcatCut, common_cuts
+from .PrebinnedCut import NoopOperation, SliceOperation, ProjectionOperation, ProjectAndSliceOperation
 
 __all__ = [
-    'AbstractCut',
     'NoCut',
     'EqualsCut',
     'TwoSidedCut',
@@ -11,7 +10,6 @@ __all__ = [
     'AndCuts',
     'ConcatCut',
     'common_cuts',
-    'PrebinnedOperation',
     'NoopOperation',
     'SliceOperation',
     'ProjectionOperation',

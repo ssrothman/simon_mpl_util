@@ -5,41 +5,7 @@ import copy
 
 from typing import List, Sequence, Union
 
-class AbstractCut:
-    @property
-    def columns(self):
-        raise NotImplementedError()
-
-    def evaluate(self, dataset):
-        raise NotImplementedError()
-
-    @property
-    def key(self):
-        raise NotImplementedError()
-
-    @property
-    def plottext(self):
-        if hasattr(self, "_plottext"):
-            return self._plottext
-        else:
-            return self._auto_plottext()
-
-    def _auto_plottext(self):
-        raise NotImplementedError()
-
-    def override_plottext(self, plottext):
-        self._plottext = plottext
-
-    def clear_override_plottext(self):
-        del self._plottext
-
-    #equality operator
-    def __eq__(self, other):
-        #error message says what subclass raised the error
-        raise NotImplementedError("Equality operator not implemented for subclass %s"%(type(self).__name__))
-    
-    def set_collection_name(self, collection_name):
-        raise NotImplementedError()
+from .Abstract import AbstractCut
 
 class NoCut(AbstractCut):
     def __init__(self):
