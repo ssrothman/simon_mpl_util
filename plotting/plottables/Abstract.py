@@ -187,10 +187,17 @@ class AbstractUnbinnedDataset(AbstractDataset):
         )
 
 class AbstractPrebinnedDataset(AbstractDataset):
-    def __init__(self, key : str, values : Any, binning : ArbitraryBinning):
+    def __init__(self, 
+                 key : str, 
+                 values : Any, 
+                 binning : ArbitraryBinning):
         super().__init__(key)
         self._data = values
         self._binning = binning
+
+    @property
+    def quantitytype(self):
+        raise NotImplementedError()
 
     @property
     def data(self):

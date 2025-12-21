@@ -323,6 +323,9 @@ def common_cuts_(cut1, cut2):
         return NoCut()
 
 def common_cuts(cuts):
+    if isinstance(cuts, AbstractCut):
+        return cuts
+    
     if len(cuts) == 0:
         return NoCut()
     elif len(cuts) == 1:

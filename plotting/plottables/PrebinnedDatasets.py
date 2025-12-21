@@ -8,6 +8,10 @@ class ValCovPairDataset(AbstractPrebinnedDataset):
         super().__init__(key, data, binning)
 
     @property
+    def quantitytype(self):
+        return "valcov"
+    
+    @property
     def values(self):
         return self._data[0]
     
@@ -43,6 +47,10 @@ class CovmatDataset(AbstractPrebinnedDataset):
 
         self._covmat = covmat
     
+    @property
+    def quantitytype(self):
+        return "covariance"
+
     @property
     def covmat(self):
         return self._covmat

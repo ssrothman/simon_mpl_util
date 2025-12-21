@@ -16,7 +16,7 @@ from simon_mpl_util.plotting.cut.Cut import AbstractCut, common_cuts, NoCut
 from simon_mpl_util.util.AribtraryBinning import ArbitraryBinning
 from simon_mpl_util.util.text import strip_units
 
-from typing import Union, List
+from typing import Literal, Union, List
 
 hep.style.use(hep.style.CMS)
 matplotlib.rcParams['savefig.dpi'] = 300
@@ -63,8 +63,11 @@ def savefig(fig, path: str, mkdir : bool=True):
 
 def make_fancy_prebinned_labels(ax_main : matplotlib.axes.Axes, 
                                 ax_pad : Union[matplotlib.axes.Axes, None],
-                                axis : ArbitraryBinning):
+                                axis : ArbitraryBinning,
+                                which : Literal['x', 'y']= 'x'):
+    
     original_xlim = ax_main.get_xlim()
+    original_ylim = ax_main.get_ylim()
 
     cfg = config['fancy_prebinned_labels']
     if not cfg['enabled']:
@@ -91,26 +94,41 @@ def make_fancy_prebinned_labels(ax_main : matplotlib.axes.Axes,
         major_ticks.append(start - 0.5)
     major_ticks.append(axis.total_size - 0.5)
     major_ticks = np.asarray(major_ticks)
-    ax_main.set_xticks(major_ticks, minor=False, labels=['']*len(major_ticks))
-    ax_main.set_xticks(np.arange(axis.total_size + 1) - 0.5, minor=True)
-    ax_main.grid(axis='x', which='major', linestyle='--', alpha=0.9)
+    if which == 'x':
+        ax_main.set_xticks(major_ticks, minor=False, labels=['']*len(major_ticks))
+        ax_main.set_xticks(np.arange(axis.total_size + 1) - 0.5, minor=True)
+    else:
+        ax_main.set_yticks(major_ticks, minor=False, labels=['']*len(major_ticks))
+        ax_main.set_yticks(np.arange(axis.total_size + 1) - 0.5, minor=True)
+    ax_main.grid(axis=which, which='major', linestyle='--', alpha=0.9)
 
     if ax_pad is not None:
-        ax_pad.grid(axis='x', which='major', linestyle='--', alpha=0.9) # pyright: ignore[reportPossiblyUnboundVariable]
+        ax_pad.grid(axis=which, which='major', linestyle='--', alpha=0.9) # pyright: ignore[reportPossiblyUnboundVariable]
         bottom_ax = ax_pad # pyright: ignore[reportPossiblyUnboundVariable]
         
-        ax2 = ax_pad.twiny()# pyright: ignore[reportPossiblyUnboundVariable]
     else:
-        ax2 = ax_main.twiny()
         bottom_ax = ax_main
 
+    if which == 'x':
+        ax2 = bottom_ax.twiny()# pyright: ignore[reportPossiblyUnboundVariable]
+    else:
+        ax2 = bottom_ax.twinx()# pyright: ignore[reportPossiblyUnboundVariable]
+
     bottom_ax.tick_params(direction='inout', which='major', 
-                            axis='x', length=cfg['ticksize']) 
+                            axis=which, length=cfg['ticksize']) 
 
     ax2.spines['top'].set_visible(False)
     ax2.spines['bottom'].set_visible(False)
-    ax2.spines['top'].set_position(('axes', 0.0))
-    ax2.set_xlim(ax_main.get_xlim())
+    ax2.spines['left'].set_visible(False)
+    ax2.spines['right'].set_visible(False)
+
+    if which == 'x':
+        ax2.spines['top'].set_position(('axes', 0.0))
+        ax2.set_xlim(ax_main.get_xlim())
+    else:
+        ax2.spines['right'].set_position(('axes', 0.0))
+        ax2.set_ylim(ax_main.get_ylim())
+
     major_tick_centers = (major_ticks[:-1] + major_ticks[1:]) / 2
     major_tick_labels = []
     axname = lookup_axis_label(axis.axis_names[0])
@@ -125,16 +143,33 @@ def make_fancy_prebinned_labels(ax_main : matplotlib.axes.Axes,
         else:
             major_tick_labels.append('$%0.3g < $%s$ \\leq %0.3g$' % (low, axname, high))
 
-    ax2.set_xticks(major_tick_centers, minor=False,
-                    labels=major_tick_labels) #dummy labels
-    ax2.set_xticks([], minor=True)
-    ax2.tick_params(axis='x', direction='in', which='both',
+    if which == 'x':
+        ax2.set_xticks(major_tick_centers, minor=False,
+                        labels=major_tick_labels) 
+        ax2.set_xticks([], minor=True)
+        ax2.tick_params(axis=which, direction='in', which='both',
                     labelbottom=True, labeltop=False,
                     labelsize=cfg['fontsize'],
                     length=0)
-    
+    else:
+        print(major_tick_centers)
+        print(original_ylim)
+        ax2.set_yticks(major_tick_centers, minor=False,
+                        labels=major_tick_labels,
+                        va='center') 
+        ax2.set_yticks([], minor=True)
+        ax2.tick_params(axis=which, direction='in', which='both',
+                    labelbottom=False, labeltop=False,
+                    labelleft=True, labelright=False,
+                    labelsize=cfg['fontsize'],
+                    length=0,
+                    labelrotation=90)
+        
     ax_main.set_xlim(original_xlim)
     ax2.set_xlim(original_xlim)
+    bottom_ax.set_ylim(original_ylim)
+    ax2.set_ylim(original_ylim)
+
     return ax2
 
 def draw_legend(ax: matplotlib.axes.Axes, nolegend: bool, scale: float=1.0, loc: Union[str, int, tuple] ='best'):

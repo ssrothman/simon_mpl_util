@@ -305,7 +305,7 @@ def plot_histogram(variable_: Union[AbstractVariable, List[AbstractVariable]],
 
     draw_legend(ax_main, nolegend)
 
-    plt.tight_layout()
+    fig.tight_layout()
 
     #print(ax2.get_xlim())
     #print(ax_main.get_xlim())
