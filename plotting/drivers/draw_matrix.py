@@ -120,8 +120,6 @@ def draw_matrix(cut: PrebinnedOperation,
 
     add_text(ax, cut, extratext)
     
-    #ax.set_aspect('equal', adjustable='box')
-
     make_fancy_prebinned_labels(ax, None, axis, 'x')
     make_fancy_prebinned_labels(ax, None, axis, 'y')
 
@@ -133,7 +131,7 @@ def draw_matrix(cut: PrebinnedOperation,
         if output_prefix is None:
             output_path = os.path.join(output_folder, 'matrix')
         else:
-            output_path = os.path.join(output_folder, output_prefix + '_matrix')
+            output_path = os.path.join(output_folder, output_prefix)
 
         output_path += '_CUT-%s' % cut.key
         output_path += '_DSET-%s' % dataset.key
