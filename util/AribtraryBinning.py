@@ -626,6 +626,17 @@ class ArbitraryBinning:
         self._Nax : int = 0
 
     @property
+    def single_block(self) -> bool:
+        '''
+        Check if this ArbitraryBinning consists of a single _BinningBlock
+        
+        :param self: This object
+        :return: True iff this ArbitraryBinning consists of a single _BinningBlock
+        :rtype: bool
+        '''
+        return len(self._blocks) == 1
+
+    @property
     def Nax(self) -> int:
         '''
         Get the number of axes in this ArbitraryBinning
