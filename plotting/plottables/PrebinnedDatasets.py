@@ -18,7 +18,7 @@ class PrebinnedDatasetBase(SingleDatasetBase):
         return self._binning
 
 class ValCovPairDataset(PrebinnedDatasetBase):
-    def __init__(self, key : str, color : str, label : str,
+    def __init__(self, key : str, color : str | None, label : str | None,
                  data : tuple[np.ndarray, np.ndarray], 
                  binning : ArbitraryBinning):
         self._key = key
@@ -55,30 +55,32 @@ class ValCovPairDataset(PrebinnedDatasetBase):
         return result, covresult
 
     def slice(self, edges):
-        result = self._binning.get_slice(self.values, **edges)
-        covresult = self._binning.get_slice_cov2d(self.cov, **edges)
+        result = self._binning.get_slice(self.values, edges)
+        covresult = self._binning.get_slice_cov2d(self.cov, edges)
         return result, covresult
 
     def _dummy_dset(self, data, binning) -> PrebinnedDatasetAccessProtocol:
         return ValCovPairDataset("", '', '', data, binning)
     
 class CovmatDataset(PrebinnedDatasetBase):
-    def __init__(self, key:str, color : str, label : str,
+    def __init__(self, key:str, color : str | None, label : str | None,
                  covmat : np.ndarray, binning : ArbitraryBinning):
         self._key = key
         self._color = color
         self._label = label
 
-        self._covmat = covmat
+        self._data = covmat
         self._binning = binning
     
     @property
     def quantitytype(self):
         return "covariance"
-
+        
     @property
     def covmat(self):
-        return self._covmat
+        if not isinstance(self._data, np.ndarray):
+            raise ValueError("Data is not a covariance matrix!")
+        return self._data
         
     def project(self, axes : Sequence[str]):
         result = self.covmat
@@ -89,7 +91,7 @@ class CovmatDataset(PrebinnedDatasetBase):
         return result
 
     def slice(self, edges : dict):
-        result = self._binning.get_slice_cov2d(self.covmat, **edges)
+        result = self._binning.get_slice_cov2d(self.covmat, edges)
         return result
     
     def _dummy_dset(self, data, binning) -> PrebinnedDatasetAccessProtocol:
