@@ -82,8 +82,8 @@ def draw_matrix(variable : VariableProtocol,
 
     add_text(ax, cut, extratext)
     
-    make_fancy_prebinned_labels(ax, None, axis, 'x')
-    make_fancy_prebinned_labels(ax, None, axis, 'y')
+    make_fancy_prebinned_labels(ax, axis, 'x')
+    make_fancy_prebinned_labels(ax, axis, 'y')
 
     ax.set_box_aspect(1)
 
