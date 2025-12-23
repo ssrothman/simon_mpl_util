@@ -1,8 +1,6 @@
 from simon_mpl_util.plotting.util.config import config
-from simon_mpl_util.plotting.variable.Variable import AbstractVariable
-from simon_mpl_util.plotting.cut.Cut import AbstractCut
-from simon_mpl_util.plotting.plottables.Datasets import AbstractDataset
 from simon_mpl_util.plotting.plottables.PlotStuff import AbstractPlotSpec
+from simon_mpl_util.plotting.typing.Protocols import VariableProtocol, CutProtocol, UnbinnedDatasetProtocol
 from simon_mpl_util.plotting.util.common import setup_canvas, add_cms_legend, savefig, add_text, draw_legend, make_oneax
 
 from simon_mpl_util.util.sanitization import ensure_same_length
@@ -13,10 +11,10 @@ import awkward as ak
 
 from typing import List, Union
 
-def scatter_2d(varX_ : Union[AbstractVariable, List[AbstractVariable]], 
-               varY_ : Union[AbstractVariable, List[AbstractVariable]], 
-               cut_: Union[AbstractCut, List[AbstractCut]], 
-               dataset_: Union[AbstractDataset, List[AbstractDataset]],
+def scatter_2d(varX_ : Union[VariableProtocol, List[VariableProtocol]], 
+               varY_ : Union[VariableProtocol, List[VariableProtocol]], 
+               cut_: Union[CutProtocol, List[CutProtocol]], 
+               dataset_: Union[UnbinnedDatasetProtocol, List[UnbinnedDatasetProtocol]],
                labels_: Union[List[str], None] = None,
                extratext : Union[str, None] = None,
                isdata: bool = False,
@@ -76,9 +74,9 @@ def scatter_2d(varX_ : Union[AbstractVariable, List[AbstractVariable]],
         
     plt.close(fig)
 
-def scatter_2d_(varX: AbstractVariable, varY: AbstractVariable, 
-                cut: AbstractCut, 
-                dataset: AbstractDataset,
+def scatter_2d_(varX: VariableProtocol, varY: VariableProtocol, 
+                cut: CutProtocol, 
+                dataset: UnbinnedDatasetProtocol,
                 label: str,
                 ax : matplotlib.axes.Axes,
                 skip_empty : bool = True,
@@ -88,12 +86,11 @@ def scatter_2d_(varX: AbstractVariable, varY: AbstractVariable,
 
     dataset.ensure_columns(needed_columns)
 
-    x = varX.evaluate(dataset)
-    y = varY.evaluate(dataset)
-    c = cut.evaluate(dataset)
+    x = varX.evaluate(dataset, cut)
+    y = varY.evaluate(dataset, cut)
 
-    xvals = ak.flatten(x[c], axis=None) # pyright: ignore[reportArgumentType]
-    yvals = ak.flatten(y[c], axis=None) # pyright: ignore[reportArgumentType]
+    xvals = ak.flatten(x, axis=None) # pyright: ignore[reportArgumentType]
+    yvals = ak.flatten(y, axis=None) # pyright: ignore[reportArgumentType]
 
     if len(xvals) == 0 and skip_empty:
         return None, (xvals, yvals)

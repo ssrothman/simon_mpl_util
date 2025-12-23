@@ -1,10 +1,6 @@
 from simon_mpl_util.plotting.util.config import config, check_auto_logx
 
-from simon_mpl_util.plotting.variable.VariableBase import AbstractVariable
-from simon_mpl_util.plotting.cut.CutBase import AbstractCut, PrebinnedOperation
-from simon_mpl_util.plotting.plottables.DatasetBase import AbstractDataset, AbstractPrebinnedDataset
-from simon_mpl_util.plotting.binning.Binning import AbstractBinning
-
+from simon_mpl_util.plotting.typing.Protocols import VariableProtocol, PrebinnedOperationProtocol, PrebinnedDatasetProtocol, PrebinnedBinningProtocol
 from simon_mpl_util.plotting.util.common import make_radial_ax, setup_canvas, add_cms_legend, savefig, add_text, draw_legend, make_oneax, make_axes_withpad, get_artist_color, make_fancy_prebinned_labels, label_from_binning
 
 from simon_mpl_util.util.AribtraryBinning import ArbitraryBinning
@@ -28,20 +24,16 @@ class _RANGES(IntEnum):
     QUARTER = 2
 
 def draw_radial_histogram(
-                   variable : AbstractVariable,
-                   cut: PrebinnedOperation, 
-                   dataset: AbstractPrebinnedDataset,
-                   binning : AbstractBinning,
+                   variable : VariableProtocol,
+                   cut: PrebinnedOperationProtocol, 
+                   dataset: PrebinnedDatasetProtocol,
+                   binning : PrebinnedBinningProtocol,
                    extratext : Union[str, None] = None,
                    density: bool = False,
                    logc : bool = True,
                    output_folder: Union[str, None] = None,
                    output_prefix: Union[str, None] = None):
     
-    #enforce prebinned
-    if not binning.kind == 'prebinned':
-        raise TypeError("draw_radial_histogram only supports prebinned binning")
-
     #get resulting binning
     axis = binning.build_prebinned_axis(dataset, cut)
 
@@ -71,7 +63,11 @@ def draw_radial_histogram(
         raise ValueError("Could not determine angular range from edges, got %f" % phirange)
     
     #get values to plot
-    hist2d = cut.evaluate(dataset)
+    hist2d = variable.evaluate(dataset, cut)
+    if not isinstance(hist2d, np.ndarray):
+        raise ValueError("Variable did not return a numpy ndarray! Instead got %s" % type(hist2d))
+    if hist2d.ndim != 2:
+        raise ValueError("Variable did not return a 2D histogram! Instead shape was %s" % hist2d.shape)
 
     #setup canvas
     fig = setup_canvas()

@@ -4,11 +4,7 @@ from typing import Union, List, Literal, get_args
 import matplotlib
 from matplotlib.colors import Normalize, SymLogNorm, LogNorm
 
-from simon_mpl_util.plotting.variable.VariableBase import AbstractVariable
-from simon_mpl_util.plotting.cut.CutBase import PrebinnedOperation
-from simon_mpl_util.plotting.plottables.DatasetBase import AbstractPrebinnedDataset
-from simon_mpl_util.plotting.binning.BinningBase import AbstractBinning
-
+from simon_mpl_util.plotting.typing.Protocols import PrebinnedOperationProtocol, PrebinnedDatasetProtocol, PrebinnedBinningProtocol, VariableProtocol
 from simon_mpl_util.plotting.util.common import add_text, label_from_binning, make_fancy_prebinned_labels, setup_canvas, make_oneax, savefig, add_cms_legend
 
 import numpy as np
@@ -16,46 +12,29 @@ import matplotlib.pyplot as plt
 
 _ALLOWED_NORMS = Literal["none", "ax1", "ax2", "correl"]
 
-def draw_matrix(cut: PrebinnedOperation, 
-                dataset: AbstractPrebinnedDataset,
-                binning : AbstractBinning,
+def draw_matrix(variable : VariableProtocol,
+                cut: PrebinnedOperationProtocol, 
+                dataset: PrebinnedDatasetProtocol,
+                binning : PrebinnedBinningProtocol,
                 extratext : Union[str, None] = None,
-                norm: _ALLOWED_NORMS = "none",
                 sym : Union[bool, None] = None,
                 logc : bool = False,
                 output_folder: Union[str, None] = None,
                 output_prefix: Union[str, None] = None):
     
-    #enforce norm options
-    valid_norms = get_args(_ALLOWED_NORMS)  
-    if norm not in valid_norms:
-        raise ValueError("Invalid norm '%s', must be one of %s" % (norm, valid_norms))
-
-    #enforce prebinned
-    if not binning.kind == 'prebinned':
-        raise TypeError("draw_matrix only supports prebinned binning")
-   
-    #correl normalization only makes sense for covariance matrices
-    #and ax1, ax2 normalization only make sense for transfer matrices
-    if dataset.quantitytype == 'covariance':
-        if norm in ['ax1', 'ax2']:
-            raise ValueError("ax1 and ax2 normalization not valid for covariance matrices")
-    elif dataset.quantitytype == 'transfer':
-        if norm == 'correl':
-            raise ValueError("correl normalization not valid for transfer matrices")
-
     #get resulting binning
     axis = binning.build_prebinned_axis(dataset, cut)
 
     #get matrix to plot
-    mat = cut.evaluate(dataset)
-    mat = _maybe_normalize(mat, norm)
+    mat = variable.evaluate(dataset, cut)
+    if not isinstance(mat, np.ndarray):
+        raise ValueError("Variable did not return a numpy ndarray! Instead got %s" % type(mat))
+    if mat.ndim != 2:
+        raise ValueError("Variable did not return a 2D matrix! Instead shape was %s" % mat.shape)
 
     #automatically determine if values are (conceptually) symmetric about zero
     if sym is None:
-        if norm == 'correl':
-            sym = True
-        elif np.min(mat) < 0 and np.max(mat) > 0:
+        if np.min(mat) < 0 and np.max(mat) > 0:
             sym = True
         else:
             sym = False
@@ -97,25 +76,8 @@ def draw_matrix(cut: PrebinnedOperation,
     ax.set_ylabel(the_xlabel)
 
     cbar = fig.colorbar(artist, ax=ax)
-    if dataset.quantitytype == 'transfer':
-        if norm == 'none':
-            cbarlabel = 'Transfer matrix'
-        elif norm == 'ax1':
-            cbarlabel = 'Row-normalized transfer matrix [TO DO: CHECK IF THIS IS GEN OR RECO]'
-        elif norm == 'ax2':
-            cbarlabel = 'Column-normalized transfer matrix [TO DO: CHECK IF THIS IS GEN OR RECO]'
-        else:
-            cbarlabel = 'Malformed quantity lol'
-    elif dataset.quantitytype == 'covariance':
-        if norm == 'none':
-            cbarlabel = 'Covariance'
-        elif norm == 'correl':
-            cbarlabel = 'Correlation'
-        else:
-            cbarlabel = 'Malformed quantity lol'
-    else:
-        cbarlabel = 'Malformed quantity lol'
-
+    
+    cbarlabel = 'LABEL TO DO'
     cbar.set_label(cbarlabel)
 
     add_text(ax, cut, extratext)
@@ -135,36 +97,12 @@ def draw_matrix(cut: PrebinnedOperation,
 
         output_path += '_CUT-%s' % cut.key
         output_path += '_DSET-%s' % dataset.key
-        output_path += '_NORM-%s' % norm
         
         if logc:
-            output_path += '_LOGC'
+            output_path += '_LOGC_TO_DO'
 
         savefig(fig, output_path)
     else:
         plt.show()
 
     plt.close(fig)
-    
-def _maybe_normalize(mat : np.ndarray,
-                     norm : _ALLOWED_NORMS) -> np.ndarray:
-    if norm == "none":
-        return mat
-    elif norm == "ax1":
-        row_sums = mat.sum(axis=1, keepdims=True)
-        row_sums[row_sums == 0] = 1
-        return mat / row_sums
-    elif norm == "ax2":
-        col_sums = mat.sum(axis=0, keepdims=True)
-        col_sums[col_sums == 0] = 1
-        return mat / col_sums
-    elif norm == "correl":
-        if mat.shape[0] != mat.shape[1]:
-            raise ValueError("Correlation normalization requires a square matrix")
-        
-        diag = np.sqrt(np.diag(mat))
-        total_sum = np.outer(diag, diag)
-        total_sum[total_sum == 0] = 1
-        return mat / total_sum
-    else:
-        raise ValueError("Invalid norm '%s'" % norm)

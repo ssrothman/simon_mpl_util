@@ -1,9 +1,6 @@
 from simon_mpl_util.plotting.util.config import config, check_auto_logx
 
-from simon_mpl_util.plotting.variable.VariableBase import AbstractVariable
-from simon_mpl_util.plotting.cut.CutBase import AbstractCut
-from simon_mpl_util.plotting.plottables.DatasetBase import AbstractDataset
-from simon_mpl_util.plotting.binning.Binning import AbstractBinning
+from simon_mpl_util.plotting.typing.Protocols import CutProtocol, VariableProtocol, BaseDatasetProtocol, BaseBinningProtocol, AutoBinningProtocol, DefaultBinningProtocol, PrebinnedBinningProtocol, BasicBinningProtocol
 
 from simon_mpl_util.plotting.util.common import setup_canvas, add_cms_legend, savefig, add_text, draw_legend, make_oneax, make_axes_withpad, get_artist_color, make_fancy_prebinned_labels, label_from_binning
 
@@ -17,11 +14,11 @@ import numpy as np
 
 from typing import List, Union
 
-def plot_histogram(variable_: Union[AbstractVariable, List[AbstractVariable]], 
-                   cut_: Union[AbstractCut, List[AbstractCut]], 
-                   weight_ : Union[AbstractVariable, List[AbstractVariable]],
-                   dataset_: Union[AbstractDataset, List[AbstractDataset]],
-                   binning : AbstractBinning,
+def plot_histogram(variable_: Union[VariableProtocol, List[VariableProtocol]], 
+                   cut_: Union[CutProtocol, List[CutProtocol]], 
+                   weight_ : Union[VariableProtocol, List[VariableProtocol]],
+                   dataset_: Union[BaseDatasetProtocol, List[BaseDatasetProtocol]],
+                   binning : BaseBinningProtocol,
                    labels_: Union[List[str], None] = None,
                    extratext : Union[str, None] = None,
                    density: bool = False,
@@ -62,21 +59,21 @@ def plot_histogram(variable_: Union[AbstractVariable, List[AbstractVariable]],
     else:
         do_ratiopad = True
 
-    if binning.kind == 'auto':
+    if isinstance(binning, AutoBinningProtocol):
         if logx:
             transform='log'
         else:
             transform=None
 
         axis = binning.build_auto_axis(variable, cut, dataset, transform=transform)
-    elif binning.kind == 'default':
+    elif isinstance(binning, DefaultBinningProtocol):
         axis = binning.build_default_axis(variable[0])
-    elif binning.kind == 'prebinned':
+    elif isinstance(binning, PrebinnedBinningProtocol):
         axis = binning.build_prebinned_axis(dataset[0], cut[0])
-    elif binning.kind == 'regular':
+    elif isinstance(binning, BasicBinningProtocol):
         axis = binning.build_axis(variable[0])
     else:
-        raise RuntimeError("Unknown binning kind: %s" % binning.kind)
+        raise RuntimeError("Binning did not match any known binning protocol!")
 
     #resolve auto logx AFTER building axis for prebinned variables
     if logx is None and isinstance(axis, ArbitraryBinning):
