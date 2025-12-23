@@ -1,6 +1,6 @@
 import copy
 
-from simon_mpl_util.plotting.util.config import lookup_axis_label
+from simon_mpl_util.plotting.config import lookup_axis_label
 from .VariableBase import VariableBase
 
 from typing import List, Sequence, assert_never, override

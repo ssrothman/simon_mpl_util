@@ -1,0 +1,32 @@
+{
+    "figsize": [12, 10],
+    "cms_label" : "Work in Progress",
+    "ratiopad" : {
+        "height" : 0.5,
+        "hspace" : 0.0,
+        "auto_ylim" : {
+            "padding" : 0.15,
+            "percentile" : 0.99,
+            "min_threshold" : 0.2
+        }
+    },
+    "fancy_prebinned_labels" : {
+        "enabled" : true,
+        "max_ndim" : 3,
+        "ticksize" : 30,
+        "fontsize" : 14,
+        "max_minor_ticks" : 100,
+        "check_label_overlap" : true,
+        "min_fontsize" : 8
+    },
+    "axis_labels": {
+        "pt" : "$p_{T}$ [GeV]",
+        "eta" : "$\\eta$",
+        "phi" : "$\\phi$"
+    },
+    "auto_logx_patterns" : [
+        "*pt",
+        "*MET",
+        "*HT"
+    ]
+}

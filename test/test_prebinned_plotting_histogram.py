@@ -72,6 +72,17 @@ plot_histogram(
     output_folder='unittest/prebinned_plot_histogram/hist',
     logy = True,
 )
+plot_histogram(
+    var1,
+    cut1,
+    weight,
+    [dset_MCstack, dset_data],
+    binning,
+    output_folder='unittest/prebinned_plot_histogram/hist',
+    logy = True,
+    pulls=True
+)
+
 
 for cut in [cut2, cut3, cut4, cut5, cut6, cut7]:
      plot_histogram(

@@ -7,9 +7,8 @@ import matplotlib.patches
 import matplotlib.pyplot as plt
 import numpy as np
 import mplhep as hep
-from pyparsing import C
 
-from .config import config, lookup_axis_label
+from simon_mpl_util.plotting.config import config, lookup_axis_label
 from .place_text import place_text
 
 from simon_mpl_util.plotting.cut import common_cuts, NoCut

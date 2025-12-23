@@ -1,10 +1,6 @@
-import json
-import re
-
 from simon_mpl_util.util.text import attempt_regex_match
-
-with open("simon_mpl_config.json", "r") as f:
-    config = json.load(f)
+from .config import config
+import re
 
 def strip_collection_names(axiskey:str) -> str:
     split_wrt_dots = axiskey.split('.')

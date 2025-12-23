@@ -1,4 +1,4 @@
-from simon_mpl_util.plotting.util.config import lookup_axis_label
+from simon_mpl_util.plotting.config import lookup_axis_label
 
 from typing import List, Protocol, Any, Union, Sequence, Tuple
 from abc import ABC, abstractmethod

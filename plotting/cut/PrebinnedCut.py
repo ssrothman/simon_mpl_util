@@ -1,5 +1,5 @@
 from simon_mpl_util.plotting.typing.Protocols import PrebinnedDatasetAccessProtocol
-from simon_mpl_util.plotting.util.config import lookup_axis_label
+from simon_mpl_util.plotting.config import lookup_axis_label
 
 from simon_mpl_util.util.text import strip_units
 from simon_mpl_util.util.AribtraryBinning import ArbitraryBinning

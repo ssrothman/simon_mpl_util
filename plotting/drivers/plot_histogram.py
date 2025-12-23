@@ -1,4 +1,4 @@
-from simon_mpl_util.plotting.util.config import config, check_auto_logx
+from simon_mpl_util.plotting.config import config, check_auto_logx
 
 from simon_mpl_util.plotting.typing.Protocols import CutProtocol, PrebinnedOperationProtocol, VariableProtocol, BaseDatasetProtocol, BaseBinningProtocol, AutoBinningProtocol, DefaultBinningProtocol, PrebinnedBinningProtocol, BasicBinningProtocol
 

@@ -1,4 +1,4 @@
-from simon_mpl_util.plotting.util.config import config, check_auto_logx
+from simon_mpl_util.plotting.config.config import config, check_auto_logx
 
 from simon_mpl_util.plotting.typing.Protocols import VariableProtocol, PrebinnedOperationProtocol, PrebinnedDatasetProtocol, PrebinnedBinningProtocol
 from simon_mpl_util.plotting.util.common import make_radial_ax, setup_canvas, add_cms_legend, savefig, add_text, draw_legend, make_oneax, make_axes_withpad, get_artist_color, make_fancy_prebinned_labels, label_from_binning

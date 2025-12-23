@@ -1,4 +1,4 @@
-from simon_mpl_util.plotting.util.config import config
+from simon_mpl_util.plotting.config.config import config
 from simon_mpl_util.plotting.plottables.PlotStuff import AbstractPlotSpec
 from simon_mpl_util.plotting.typing.Protocols import VariableProtocol, CutProtocol, UnbinnedDatasetProtocol
 from simon_mpl_util.plotting.util.common import setup_canvas, add_cms_legend, savefig, add_text, draw_legend, make_oneax

@@ -1,4 +1,4 @@
-from simon_mpl_util.plotting.util.config import config, lookup_axis_label
+from simon_mpl_util.plotting.config import config, lookup_axis_label
 
 from simon_mpl_util.plotting.typing.Protocols import VariableProtocol, CutProtocol, PrebinnedOperationProtocol, BinningKind
 
