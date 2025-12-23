@@ -7,11 +7,13 @@ import matplotlib.patches
 import matplotlib.pyplot as plt
 import numpy as np
 import mplhep as hep
+from pyparsing import C
 
 from .config import config, lookup_axis_label
 from .place_text import place_text
 
-from simon_mpl_util.plotting.cut.Cut import AbstractCut, common_cuts, NoCut
+from simon_mpl_util.plotting.cut import common_cuts, NoCut
+from simon_mpl_util.plotting.typing.Protocols import CutProtocol
 
 from simon_mpl_util.util.AribtraryBinning import ArbitraryBinning
 from simon_mpl_util.util.text import strip_units
@@ -213,10 +215,10 @@ def draw_legend(ax: matplotlib.axes.Axes, nolegend: bool, scale: float=1.0, loc:
                     draw_legend(ax, nolegend, scale=scale+1, loc=loc)
                     break
 
-def add_text(ax : matplotlib.axes.Axes, cut: Union[AbstractCut, List[AbstractCut]], extratext: Union[str, None]=None):
+def add_text(ax : matplotlib.axes.Axes, cut: Union[CutProtocol, List[CutProtocol]], extratext: Union[str, None]=None):
     ccut = common_cuts(cut)
-    if type(ccut) is not NoCut:
-        thetext = ccut.plottext
+    if not isinstance(cut, NoCut):
+        thetext = ccut.label
     else:
         thetext = ''
         

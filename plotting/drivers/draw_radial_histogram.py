@@ -1,8 +1,8 @@
 from simon_mpl_util.plotting.util.config import config, check_auto_logx
 
-from simon_mpl_util.plotting.variable.Abstract import AbstractVariable
-from simon_mpl_util.plotting.cut.Abstract import AbstractCut, PrebinnedOperation
-from simon_mpl_util.plotting.plottables.Abstract import AbstractDataset, AbstractPrebinnedDataset
+from simon_mpl_util.plotting.variable.VariableBase import AbstractVariable
+from simon_mpl_util.plotting.cut.CutBase import AbstractCut, PrebinnedOperation
+from simon_mpl_util.plotting.plottables.DatasetBase import AbstractDataset, AbstractPrebinnedDataset
 from simon_mpl_util.plotting.binning.Binning import AbstractBinning
 
 from simon_mpl_util.plotting.util.common import make_radial_ax, setup_canvas, add_cms_legend, savefig, add_text, draw_legend, make_oneax, make_axes_withpad, get_artist_color, make_fancy_prebinned_labels, label_from_binning

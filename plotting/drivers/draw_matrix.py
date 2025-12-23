@@ -4,10 +4,10 @@ from typing import Union, List, Literal, get_args
 import matplotlib
 from matplotlib.colors import Normalize, SymLogNorm, LogNorm
 
-from simon_mpl_util.plotting.variable.Abstract import AbstractVariable
-from simon_mpl_util.plotting.cut.Abstract import PrebinnedOperation
-from simon_mpl_util.plotting.plottables.Abstract import AbstractPrebinnedDataset
-from simon_mpl_util.plotting.binning.Abstract import AbstractBinning
+from simon_mpl_util.plotting.variable.VariableBase import AbstractVariable
+from simon_mpl_util.plotting.cut.CutBase import PrebinnedOperation
+from simon_mpl_util.plotting.plottables.DatasetBase import AbstractPrebinnedDataset
+from simon_mpl_util.plotting.binning.BinningBase import AbstractBinning
 
 from simon_mpl_util.plotting.util.common import add_text, label_from_binning, make_fancy_prebinned_labels, setup_canvas, make_oneax, savefig, add_cms_legend
 

@@ -1,9 +1,7 @@
-from .Variable import variable_from_string, PrebinnedVariable, ConstantVariable, BasicVariable, ConcatVariable, AkNumVariable, RatioVariable, ProductVariable, DifferenceVariable, SumVariable, CorrectionlibVariable, UFuncVariable, RateVariable
+from .Variable import  ConstantVariable, BasicVariable, ConcatVariable, AkNumVariable, RatioVariable, ProductVariable, DifferenceVariable, SumVariable, CorrectionlibVariable, UFuncVariable
 from .CompositeVariable import RelativeResolutionVariable, Magnitude3dVariable, Magnitude2dVariable, Distance3dVariable, EtaFromXYZVariable, PhiFromXYZVariable
-
+from .PrebinnedVariable import PrebinnedVariable
 __all__ = [
-    'variable_from_string',
-    'PrebinnedVariable',
     'ConstantVariable',
     'BasicVariable',
     'ConcatVariable',
@@ -14,11 +12,11 @@ __all__ = [
     'SumVariable',
     'CorrectionlibVariable',
     'UFuncVariable',
-    'RateVariable',
     'RelativeResolutionVariable',
     'Magnitude3dVariable',
     'Magnitude2dVariable',
     'Distance3dVariable',       
     'EtaFromXYZVariable',
-    'PhiFromXYZVariable'
+    'PhiFromXYZVariable',
+    'PrebinnedVariable',
 ]

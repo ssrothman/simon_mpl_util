@@ -1,9 +1,6 @@
 from simon_mpl_util.plotting.util.config import config, lookup_axis_label
 
-from simon_mpl_util.plotting.variable.Abstract import AbstractVariable
-from simon_mpl_util.plotting.plottables.Abstract import AbstractDataset
-from simon_mpl_util.plotting.cut.Abstract import AbstractCut, PrebinnedOperation
-from .Abstract import AbstractBinning
+from simon_mpl_util.plotting.typing.Protocols import VariableProtocol, CutProtocol, PrebinnedOperationProtocol, BinningKind
 
 from simon_mpl_util.util.AribtraryBinning import ArbitraryBinning
 
@@ -11,7 +8,9 @@ import hist
 import awkward as ak
 import numpy as np
 
-from typing import Union, List
+from typing import Any, Union, List
+
+from .BinningBase import BinningBase
 
 def transform_from_string(str : Union[str, None]) -> Union[hist.axis.transform.AxisTransform, None]:
     if str is None or str.lower() == "none":
@@ -19,7 +18,7 @@ def transform_from_string(str : Union[str, None]) -> Union[hist.axis.transform.A
     else:
         return getattr(hist.axis.transform, str)
 
-class AutoIntCategoryBinning(AbstractBinning):
+class AutoIntCategoryBinning(BinningBase):
     def __init__(self, label_lookup : dict[str, str] = {}):
         self._label_lookup = label_lookup
 
@@ -32,25 +31,24 @@ class AutoIntCategoryBinning(AbstractBinning):
         return True
     
     @property
-    def kind(self) -> str:
-        return "auto"
+    def kind(self) -> BinningKind:
+        return BinningKind.AUTO
     
     def build_auto_axis(self, 
-                        variables: List[AbstractVariable], 
-                        cuts: List[AbstractCut], 
-                        datasets: List[AbstractDataset], 
+                        variables: List[VariableProtocol], 
+                        cuts: List[CutProtocol], 
+                        datasets: List[Any], 
                         transform: Union[str, None]=None) -> hist.axis.AxesMixin:
         values = []
         lens = []
         for var, cut, dataset in zip(variables, cuts, datasets):
             needed_columns = list(set(var.columns + cut.columns))
             dataset.ensure_columns(needed_columns)
-            v = var.evaluate(dataset)
-            c = cut.evaluate(dataset)
-            values.append(ak.flatten(v[c], axis=None)) # pyright: ignore[reportArgumentType]
+            v = var.evaluate(dataset, cut)
+            values.append(ak.flatten(v, axis=None)) 
             lens.append(len(values[-1]))
 
-        all_values = ak.to_numpy(ak.flatten(values, axis=None)) # pyright: ignore[reportArgumentType]
+        all_values = ak.to_numpy(ak.flatten(values, axis=None)) 
         unique_values = np.unique(all_values)
 
         return hist.axis.IntCategory(
@@ -60,7 +58,7 @@ class AutoIntCategoryBinning(AbstractBinning):
             growth=False
         )
 
-class AutoBinning(AbstractBinning):
+class AutoBinning(BinningBase):
     def __init__(self):
         self._force_low = None
         self._force_high = None
@@ -70,17 +68,21 @@ class AutoBinning(AbstractBinning):
         return False
     
     @property
-    def kind(self) -> str:
-        return "auto"
+    def label_lookup(self) -> dict[str, str]:
+        return {}
+
+    @property
+    def kind(self) -> BinningKind:
+        return BinningKind.AUTO
     
     def force_range(self, minval: Union[float, None], maxval: Union[float, None]):
         self._force_low = minval
         self._force_high = maxval
 
     def build_auto_axis(self, 
-                        variables: List[AbstractVariable], 
-                        cuts: List[AbstractCut], 
-                        datasets: List[AbstractDataset], 
+                        variables: List[VariableProtocol], 
+                        cuts: List[CutProtocol], 
+                        datasets: List[Any], 
                         transform: Union[str, None]=None) -> hist.axis.AxesMixin:
 
         lens = []
@@ -90,9 +92,8 @@ class AutoBinning(AbstractBinning):
         for var, cut, dataset in zip(variables, cuts, datasets):
             needed_columns = list(set(var.columns + cut.columns))
             dataset.ensure_columns(needed_columns)
-            v = var.evaluate(dataset)
-            c = cut.evaluate(dataset)
-            values = ak.to_numpy(ak.flatten(v[c], axis=None)) # pyright: ignore[reportArgumentType]
+            v = var.evaluate(dataset, cut)
+            values = ak.to_numpy(ak.flatten(v, axis=None)) # pyright: ignore[reportArgumentType]
             values = values[np.isfinite(values)]
             lens.append(len(values))
             minvals.append(np.nanmin(values))
@@ -119,7 +120,7 @@ class AutoBinning(AbstractBinning):
             #heuristic for a reasonable number of bins
             nbins = min(max(50, int(np.power(minlen, 1/3))), 150)
 
-            return RegularBinning(
+            return BasicBinning(
                 nbins=nbins,
                 low=minval,
                 high=maxval,
@@ -131,14 +132,14 @@ class AutoBinning(AbstractBinning):
 
             if transform is not None:
                 raise ValueError("Cannot use transform in AutoBinning with non-floating point variable")
-            return RegularBinning(
+            return BasicBinning(
                 nbins=nbins,
                 low=minval-0.5,
                 high=maxval+0.5,
                 transform=transform
             ).build_axis(variables[0])
 
-class DefaultBinning(AbstractBinning):
+class DefaultBinning(BinningBase):
     def __init__(self):
         pass
 
@@ -147,13 +148,17 @@ class DefaultBinning(AbstractBinning):
         return False
     
     @property
-    def kind(self) -> str:
-        return "default"
+    def label_lookup(self) -> dict[str, str]:
+        return {}
+
+    @property
+    def kind(self) -> BinningKind:
+        return BinningKind.DEFAULT
     
-    def build_default_axis(self, variable: AbstractVariable) -> hist.axis.AxesMixin:
+    def build_default_axis(self, variable: VariableProtocol) -> hist.axis.AxesMixin:
         cfg = config['default_binnings'][variable.key]
         if cfg['type'] == 'regular':
-            return RegularBinning(
+            return BasicBinning(
                 nbins=cfg['nbins'],
                 low=cfg['low'],
                 high=cfg['high'],
@@ -166,7 +171,7 @@ class DefaultBinning(AbstractBinning):
         else:
             raise ValueError("Unknown binning type: %s"%(cfg['type']))
 
-class RegularBinning(AbstractBinning):
+class BasicBinning(BinningBase):
     def __init__(self, nbins : int, low : Union[float, int], high: Union[float, int], transform : Union[str, None]=None):
         self._nbins = nbins
         self._low = low
@@ -181,8 +186,12 @@ class RegularBinning(AbstractBinning):
         return False
     
     @property
-    def kind(self) -> str:
-        return "regular"
+    def label_lookup(self) -> dict[str, str]:
+        return {}
+
+    @property
+    def kind(self) -> BinningKind:
+        return BinningKind.BASIC
     
     @property
     def nbins(self) -> int:
@@ -200,7 +209,7 @@ class RegularBinning(AbstractBinning):
     def transform(self) -> Union[hist.axis.transform.AxisTransform, None]:
         return self._transform
     
-    def build_axis(self, variable: AbstractVariable) -> hist.axis.AxesMixin:
+    def build_axis(self, variable: VariableProtocol) -> hist.axis.AxesMixin:
         return hist.axis.Regular(
             self.nbins,
             self.low,
@@ -210,7 +219,7 @@ class RegularBinning(AbstractBinning):
             label=lookup_axis_label(variable.key)
         )
     
-class ExplicitBinning(AbstractBinning):
+class ExplicitBinning(BinningBase):
     def __init__(self, edges: List[Union[float, int]]):
         self._edges = edges
 
@@ -219,17 +228,38 @@ class ExplicitBinning(AbstractBinning):
         return False
     
     @property
+    def label_lookup(self) -> dict[str, str]:
+        return {}
+
+    @property
     def edges(self) -> List[Union[float, int]]:
         return self._edges
     
     @property
-    def kind(self) -> str:
-        return "regular"
+    def kind(self) -> BinningKind:
+        return BinningKind.BASIC
     
-    def build_axis(self, variable: AbstractVariable) -> hist.axis.AxesMixin:
+    def build_axis(self, variable: VariableProtocol) -> hist.axis.AxesMixin:
         return hist.axis.Variable(
             self.edges,
             name=variable.key,
             label=lookup_axis_label(variable.key)
         )
     
+class PrebinnedBinning(BinningBase):
+    @property
+    def kind(self) -> BinningKind:
+        return BinningKind.PREBINNED
+    
+    @property
+    def has_custom_labels(self) -> bool:
+        return False
+    
+    def build_prebinned_axis(self,
+                             dataset : Any,
+                             cut : CutProtocol) -> ArbitraryBinning:
+        
+        if isinstance(cut, PrebinnedOperationProtocol):
+            return cut.resulting_binning(dataset.binning)
+        else:
+            raise ValueError("Cut must be a PrebinnedOperationProtocol to build prebinned axis")

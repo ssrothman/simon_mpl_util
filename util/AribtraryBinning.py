@@ -317,7 +317,7 @@ class _BinningBlock:
         else:
             raise ValueError(f"Invalid type for indices: {type(indices)}. Expected int, list, tuple, dict, or slice.")
 
-    def flatten_index(self, **theindices : dict[str, int]) -> int:
+    def flatten_index(self, theindices : dict[str, int]) -> int:
         '''
         Get flat index corresponding to a fully-specified set of axis indices such that data[flat_index] gives the value at those indices.
         Inverse of unflatten_index().
@@ -366,7 +366,7 @@ class _BinningBlock:
             result[name] = (index // self.strides[i]) % self.extents[i]
         return result
 
-    def get_slice_indices(self, **sliceindices : dict) -> np.ndarray: 
+    def get_slice_indices(self, sliceindices : dict) -> np.ndarray: 
         '''
         Get all the flat indices corresponding to a (not necessarily contiguous in memory) slice speficied by the input. 
         
@@ -401,7 +401,7 @@ class _BinningBlock:
 
         return np.asarray(indices, dtype=np.int64)
 
-    def get_slice_from_indices(self, data : np.ndarray, **sliceindices : dict) -> np.ndarray:
+    def get_slice_from_indices(self, data : np.ndarray, sliceindices : dict) -> np.ndarray:
         '''
         Use get_slice_indices() to extract the specified slice from the data. 
         
@@ -415,14 +415,14 @@ class _BinningBlock:
         :return: An np.ndarray containing the extracted slice
         :rtype: ndarray[Any, Any]
         '''
-        indices = self.get_slice_indices(**sliceindices)
+        indices = self.get_slice_indices(sliceindices)
         #if type(data) is torch.Tensor:
         #    return torch.take(data, torch.tensor(self.offset + indices, device=data.device))
         #else:
         return np.take(data, self.offset+indices, axis=0)
 
 
-    def get_slice_from_edges(self, data : np.ndarray, **edges : dict) -> np.ndarray:
+    def get_slice_from_edges(self, data : np.ndarray, edges : dict) -> np.ndarray:
         '''
         Wrap get_slice_from_indices() to extract a slice specified by bin edges rather than indices. 
         
@@ -437,10 +437,10 @@ class _BinningBlock:
         :rtype: ndarray[Any, Any]
         '''
         indicesdict : dict = {name: self.edges_to_indices(name, edges[name]) for name in edges}
-        return self.get_slice_from_indices(data, **indicesdict)
+        return self.get_slice_from_indices(data, indicesdict)
 
 
-    def assign_to_indices(self, data : np.ndarray, values : np.ndarray, **indices : dict):
+    def assign_to_indices(self, data : np.ndarray, values : np.ndarray, indices : dict):
         '''
         Assign values to the specified indices in the data array
         
@@ -454,10 +454,10 @@ class _BinningBlock:
             This dictionary need not specify all axes in the block; any axes not specified will be allowed to run over their full range
         :type indices: dict
         '''
-        indices_ = self.get_slice_indices(**indices)
+        indices_ = self.get_slice_indices(indices)
         data[indices_ + self.offset] = values
         
-    def assign_to_indices_2d(self, data : np.ndarray, values : np.ndarray, **sliceindices : dict):
+    def assign_to_indices_2d(self, data : np.ndarray, values : np.ndarray, sliceindices : dict):
         '''
         Utility for assigning to indices in 2D (usually covariance) matrices.
         Has the major limitation that it only works for contiguous-in-memory blocks of indices
@@ -472,7 +472,7 @@ class _BinningBlock:
             This dictionary need not specify all axes in the block; any axes not specified will be allowed to run over their full range
         :type indices: dict
         '''
-        indices = self.get_slice_indices(**sliceindices)
+        indices = self.get_slice_indices(sliceindices)
 
         #check if indices are contiguous
         indexmin = np.min(indices)
@@ -529,7 +529,7 @@ class _BinningBlock:
 
         return result, newblock
 
-    def value_at(self, data : np.ndarray, **indices : dict):
+    def value_at(self, data : np.ndarray, indices : dict):
         '''
         Lookup value in data at the specified indices
         
@@ -541,9 +541,9 @@ class _BinningBlock:
         :return: The value at the specified indices
         :rtype: Any
         '''
-        return data[self.offset+self.flatten_index(**indices)]
+        return data[self.offset+self.flatten_index(indices)]
 
-    def edges_in_block(self, **sliceedges: dict) -> bool:
+    def edges_in_block(self, sliceedges: dict) -> bool:
         '''
         Check whether the specified edges are fully-contained within this block.
         
@@ -574,7 +574,7 @@ class _BinningBlock:
 
         return True
 
-    def clip_edges_to_block(self, **sliceedges : dict) -> Union[None, dict]:
+    def clip_edges_to_block(self, sliceedges : dict) -> Union[None, dict]:
         '''
         Clip the specified edges to be within this block
         
@@ -780,7 +780,7 @@ class ArbitraryBinning:
             block.from_dict(blockdata)
             self._blocks.append(block)
         
-    def value_at(self, data : np.ndarray, **theedges : dict):
+    def value_at(self, data : np.ndarray, theedges : dict):
         '''
         Lookup value at the specified bin, identified by the lower bin edges.
         
@@ -797,7 +797,7 @@ class ArbitraryBinning:
         '''
         in_block = np.zeros(len(self._blocks), dtype=bool)
         for i, block in enumerate(self._blocks):
-            if block.edges_in_block(**theedges):
+            if block.edges_in_block(theedges):
                 in_block[i] = True
 
         if np.sum(in_block) == 0:
@@ -814,10 +814,10 @@ class ArbitraryBinning:
 
             #pass empty name parameter for dict input
             #I guarentee that dict inputs give dict outputs, byt pyright doesn't see that, so ignore the type error
-            theindices : dict = self._blocks[whichblock].edges_to_indices('', **theedges) # pyright: ignore[reportAssignmentType]
-            return self._blocks[whichblock].value_at(data, **theindices)
+            theindices : dict = self._blocks[whichblock].edges_to_indices('', theedges) # pyright: ignore[reportAssignmentType]
+            return self._blocks[whichblock].value_at(data, theindices)
         
-    def get_slice(self, data : np.ndarray, **theedges : dict) -> np.ndarray:
+    def get_slice(self, data : np.ndarray, theedges : dict) -> np.ndarray:
         '''
         Get a slice of the data specified by the provided edges.
         
@@ -837,7 +837,7 @@ class ArbitraryBinning:
         overlap_block = np.ones(len(self._blocks), dtype=bool)
         clipped_edges = []
         for i, block in enumerate(self._blocks):
-            clipped = block.clip_edges_to_block(**theedges)
+            clipped = block.clip_edges_to_block(theedges)
             if clipped is None:
                 overlap_block[i] = False
                 clipped_edges.append(None)
@@ -854,14 +854,14 @@ class ArbitraryBinning:
 
         for i, block in enumerate(self._blocks):
             if overlap_block[i]:
-                nextslice = block.get_slice_from_edges(data, **clipped_edges[i])
+                nextslice = block.get_slice_from_edges(data, clipped_edges[i])
                 #if type(data) is torch.Tensor:
                 #    result = torch.cat((result, theslice), dim=0)
                 #else:
                 result = np.append(result, nextslice, axis=0)
         return result
 
-    def get_slice_cov2d(self, data : np.ndarray, **theedges : dict) -> np.ndarray:
+    def get_slice_cov2d(self, data : np.ndarray, theedges : dict) -> np.ndarray:
         '''
         Wrapper for get_slice() to handle 2D (usually covariance) matrices. 
         Just calls get_slice() twice, transposing the data inbetween to index the other axis.
@@ -876,10 +876,10 @@ class ArbitraryBinning:
         :return: The sliced data
         :rtype: ndarray[Any, Any]
         '''
-        result = self.get_slice(data.T, **theedges)
-        return self.get_slice(result.T, **theedges)
+        result = self.get_slice(data.T, theedges)
+        return self.get_slice(result.T, theedges)
 
-    def get_sliced_binning(self, **theedges : dict) -> 'ArbitraryBinning':
+    def get_sliced_binning(self, theedges : dict) -> 'ArbitraryBinning':
         '''
         Get a new ArbitraryBinning representing the binning structure of the slice specified by the provided edges.
         
@@ -897,7 +897,7 @@ class ArbitraryBinning:
         overlap_block = np.ones(len(self._blocks), dtype=bool)
         clipped_edges = []
         for i, block in enumerate(self._blocks):
-            clipped = block.clip_edges_to_block(**theedges)
+            clipped = block.clip_edges_to_block(theedges)
             if clipped is None:
                 overlap_block[i] = False
                 clipped_edges.append(None)
@@ -1214,7 +1214,7 @@ class ArbitraryBinning:
         for i, block in enumerate(axisblocks):
             indexing = block['slice']
             shape = shapes[indexing]
-            flux = fluxbinning.get_slice(fluxes, **block['edges'])
+            flux = fluxbinning.get_slice(fluxes, block['edges'])
             result[indexing] = shape * flux
 
         return result
@@ -1239,7 +1239,7 @@ class ArbitraryBinning:
         sizes = [np.max(specblock[name]) - np.min(specblock[name]) for name in self._axis_names]
 
         #get the slice of data corresponding to the full range of the specblock
-        theslice = self._blocks[0].get_slice_from_indices(data, **ranges)
+        theslice = self._blocks[0].get_slice_from_indices(data, ranges)
 
         #preserve trailing data dimensions
         extradims = list(data.shape[1:])
@@ -1307,12 +1307,12 @@ class ArbitraryBinning:
             globalindices = np.empty((0,), dtype=np.int64)
             for block in self._blocks:
                 #clip the slice to this block
-                blockslice : Union[dict, None] = block.clip_edges_to_block(**theslice)
+                blockslice : Union[dict, None] = block.clip_edges_to_block(theslice)
                 if blockslice is not None: #if clipped slice is non-empty
                     #lookup indices from edges
                     blockslice = {name: block.edges_to_indices(name, blockslice[name]) for name in blockslice}
                     #get the flat indices from the block
-                    nextindices = block.offset+block.get_slice_indices(**blockslice)
+                    nextindices = block.offset+block.get_slice_indices(blockslice)
                     #append to global list
                     globalindices = np.append(globalindices, nextindices)
 
@@ -1456,7 +1456,7 @@ class ArbitraryGenRecoBinning:
         self._recobinning = ArbitraryBinning()
         self._recobinning.from_dict(resultdict['reco'])
 
-    def get_slice(self, data : np.ndarray, genreco : str, **theedges : dict) -> np.ndarray:
+    def get_slice(self, data : np.ndarray, genreco : str, theedges : dict) -> np.ndarray:
         '''
         Get a slice of the data specified by the provided edges, for either generator-level or reconstruction-level binning.
         
@@ -1479,9 +1479,9 @@ class ArbitraryGenRecoBinning:
         else:
             raise ValueError("genreco must be 'gen' or 'reco'")
 
-        return thebinning.get_slice(data, **theedges)
+        return thebinning.get_slice(data, theedges)
 
-    def get_slice_cov2d(self, data : np.ndarray, genreco : str, **theedges : dict) -> np.ndarray:
+    def get_slice_cov2d(self, data : np.ndarray, genreco : str, theedges : dict) -> np.ndarray:
         '''
         Get a slice of the 2D data (usually covariance matrix) specified by the provided edges, for either generator-level or reconstruction-level binning.
         This calls get_slice() twice, transposing the data inbetween to index the other axis.
@@ -1505,9 +1505,9 @@ class ArbitraryGenRecoBinning:
         else:
             raise ValueError("genreco must be 'gen' or 'reco'")
 
-        return thebinning.get_slice_cov2d(data, **theedges)
+        return thebinning.get_slice_cov2d(data, theedges)
 
-    def get_slice_transfer2d(self, data : np.ndarray, **theedges : dict) -> np.ndarray:
+    def get_slice_transfer2d(self, data : np.ndarray, theedges : dict) -> np.ndarray:
         '''
         Get a slice of the 2D transfer matrix data specified by the provided edges.
         This calls get_slice() twice, once for generator-level and once for reconstruction-level binning
@@ -1522,8 +1522,8 @@ class ArbitraryGenRecoBinning:
         :return: The sliced data
         :rtype: ndarray[Any, Any]
         '''
-        result = self.get_slice(data.T, genreco='gen', **theedges)
-        result = self.get_slice(result.T, genreco='reco', **theedges)
+        result = self.get_slice(data.T, genreco='gen', theedges=theedges)
+        result = self.get_slice(result.T, genreco='reco', theedges=theedges)
         return result
 
     def project_out(self, data : np.ndarray, genreco : str, axis_name : str) -> Tuple[np.ndarray, 'ArbitraryBinning']:

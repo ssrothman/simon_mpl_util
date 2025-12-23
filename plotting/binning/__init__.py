@@ -1,11 +1,10 @@
-from .Binning import AutoIntCategoryBinning, AutoBinning, DefaultBinning, RegularBinning, ExplicitBinning
-from .PrebinnedBinning import PrebinnedBinning
+from .Binning import AutoIntCategoryBinning, AutoBinning, DefaultBinning, BasicBinning, ExplicitBinning, PrebinnedBinning
 
 __all__ = [
     'AutoIntCategoryBinning',
     'AutoBinning',
     'DefaultBinning',
-    'RegularBinning',
+    'BasicBinning',
     'ExplicitBinning',
     'PrebinnedBinning'
 ]

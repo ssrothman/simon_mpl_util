@@ -1,16 +1,13 @@
-from .Variable import AbstractVariable, variable_from_string, UFuncVariable, SumVariable, DifferenceVariable
+from .Variable import UFuncVariable, SumVariable, DifferenceVariable
+from .VariableBase import VariableBase
+from simon_mpl_util.plotting.typing.Protocols import VariableProtocol
 
 from simon_mpl_util.util.coordinates import xyz_to_eta_phi
 
-class RelativeResolutionVariable(AbstractVariable):
-    def __init__(self, gen, reco):
-        self.gen = gen
-        self.reco = reco
-
-        if type(gen) is str:
-            self.gen = variable_from_string(gen)
-        if type(reco) is str:
-            self.reco = variable_from_string(reco)
+class RelativeResolutionVariable(VariableBase):
+    def __init__(self, gen : VariableProtocol, reco : VariableProtocol):
+        self._gen = gen
+        self._reco = reco
 
     @property
     def _natural_centerline(self):
@@ -22,44 +19,44 @@ class RelativeResolutionVariable(AbstractVariable):
 
     @property
     def columns(self):
-        return list(set(self.gen.columns + self.reco.columns))
+        return list(set(self._gen.columns + self._reco.columns))
     
-    def evaluate(self, dataset):
-        gen = self.gen.evaluate(dataset)
-        reco = self.reco.evaluate(dataset)
+    def evaluate(self, dataset, cut):
+        gen = self._gen.evaluate(dataset, cut)
+        reco = self._reco.evaluate(dataset, cut)
         return (reco - gen) / gen
 
     @property
     def key(self):
-        return "%s_minus_%s_over_%s"%(self.reco.key, self.gen.key, self.gen.key)
+        return "%s_minus_%s_over_%s"%(self._reco.key, self._gen.key, self._gen.key)
     
     def __eq__(self, other):
         if type(other) is not RelativeResolutionVariable:
             return False
-        return self.gen == other.gen and self.reco == other.reco
+        return self._gen == other._gen and self._reco == other._reco
 
     def set_collection_name(self, collection_name):
-        self.gen.set_collection_name(collection_name)
-        self.reco.set_collection_name(collection_name)
+        self._gen.set_collection_name(collection_name)
+        self._reco.set_collection_name(collection_name)
 
-class Magnitude3dVariable(AbstractVariable):
-    def __init__(self, xvar, yvar, zvar):
+class Magnitude3dVariable(VariableBase):
+    def __init__(self, xvar: VariableProtocol, yvar: VariableProtocol, zvar: VariableProtocol):
         import numpy as np
 
-        self.xvar = xvar
-        self.yvar = yvar
-        self.zvar = zvar
+        self._xvar = xvar
+        self._yvar = yvar
+        self._zvar = zvar
 
-        self.x2var = UFuncVariable(self.xvar, np.square)
-        self.y2var = UFuncVariable(self.yvar, np.square)
-        self.z2var = UFuncVariable(self.zvar, np.square)
+        self._x2var = UFuncVariable(self._xvar, np.square)
+        self._y2var = UFuncVariable(self._yvar, np.square)
+        self._z2var = UFuncVariable(self._zvar, np.square)
 
         self.r2var = SumVariable(
-            SumVariable(self.x2var, self.y2var),
-            self.z2var
+            SumVariable(self._x2var, self._y2var),
+            self._z2var
         )
 
-        self.rvar = UFuncVariable(self.r2var, np.sqrt)
+        self._rvar = UFuncVariable(self.r2var, np.sqrt)
     
     @property
     def _natural_centerline(self):
@@ -72,43 +69,43 @@ class Magnitude3dVariable(AbstractVariable):
     @property
     def columns(self):
         return list(set(
-            self.xvar.columns +
-            self.yvar.columns +
-            self.zvar.columns
+            self._xvar.columns +
+            self._yvar.columns +
+            self._zvar.columns
         ))  
     
-    def evaluate(self, dataset):
-        return self.rvar.evaluate(dataset)
+    def evaluate(self, dataset, cut):
+        return self._rvar.evaluate(dataset, cut)
     
     @property
     def key(self):
-        return "sqrt(%s^2 + %s^2 + %s^2)"%(self.xvar.key, self.yvar.key, self.zvar.key)
+        return "sqrt(%s^2 + %s^2 + %s^2)"%(self._xvar.key, self._yvar.key, self._zvar.key)
 
     def __eq__(self, other):
         if type(other) is not Magnitude3dVariable:
             return False
-        return (self.xvar == other.xvar and
-                self.yvar == other.yvar and
-                self.zvar == other.zvar)
+        return (self._xvar == other._xvar and
+                self._yvar == other._yvar and
+                self._zvar == other._zvar)
 
     def set_collection_name(self, collection_name):
-        self.rvar.set_collection_name(collection_name)
-        self.xvar.set_collection_name(collection_name)
-        self.yvar.set_collection_name(collection_name)
-        self.zvar.set_collection_name(collection_name)
+        self._rvar.set_collection_name(collection_name)
+        self._xvar.set_collection_name(collection_name)
+        self._yvar.set_collection_name(collection_name)
+        self._zvar.set_collection_name(collection_name)
 
-class Magnitude2dVariable(AbstractVariable):
+class Magnitude2dVariable(VariableBase):
     def __init__(self, xvar, yvar):
         import numpy as np
 
-        self.xvar = xvar
-        self.yvar = yvar
+        self._xvar = xvar
+        self._yvar = yvar
 
-        self.x2var = UFuncVariable(self.xvar, np.square)
-        self.y2var = UFuncVariable(self.yvar, np.square)
+        self._x2var = UFuncVariable(self._xvar, np.square)
+        self._y2var = UFuncVariable(self._yvar, np.square)
 
-        self.r2var = SumVariable(self.x2var, self.y2var)
-        self.rvar = UFuncVariable(self.r2var, np.sqrt)
+        self._r2var = SumVariable(self._x2var, self._y2var)
+        self._rvar = UFuncVariable(self._r2var, np.sqrt)
     
     @property
     def _natural_centerline(self):
@@ -121,40 +118,40 @@ class Magnitude2dVariable(AbstractVariable):
     @property
     def columns(self):
         return list(set(
-            self.xvar.columns +
-            self.yvar.columns
+            self._xvar.columns +
+            self._yvar.columns
         ))  
     
-    def evaluate(self, dataset):
-        return self.rvar.evaluate(dataset)
+    def evaluate(self, dataset, cut):
+        return self._rvar.evaluate(dataset, cut)
     
     @property
     def key(self):
-        return "sqrt(%s^2 + %s^2)"%(self.xvar.key, self.yvar.key)
+        return "sqrt(%s^2 + %s^2)"%(self._xvar.key, self._yvar.key)
 
     def __eq__(self, other):
         if type(other) is not Magnitude3dVariable:
             return False
-        return (self.xvar == other.xvar and
-                self.yvar == other.yvar)
+        return (self._xvar == other._xvar and
+                self._yvar == other._yvar)
 
     def set_collection_name(self, collection_name):
-        self.rvar.set_collection_name(collection_name)
-        self.xvar.set_collection_name(collection_name)
-        self.yvar.set_collection_name(collection_name)
+        self._rvar.set_collection_name(collection_name)
+        self._xvar.set_collection_name(collection_name)
+        self._yvar.set_collection_name(collection_name)
 
-class Distance3dVariable(AbstractVariable):
+class Distance3dVariable(VariableBase):
     def __init__(self, x1var, y1var, z1var, x2var, y2var, z2var):
         import numpy as np
 
-        self.dxvar = DifferenceVariable(x1var, x2var)
-        self.dyvar = DifferenceVariable(y1var, y2var)
-        self.dzvar = DifferenceVariable(z1var, z2var)
+        self._dxvar = DifferenceVariable(x1var, x2var)
+        self._dyvar = DifferenceVariable(y1var, y2var)
+        self._dzvar = DifferenceVariable(z1var, z2var)
 
         self.magnitude_var = Magnitude3dVariable(
-            self.dxvar,
-            self.dyvar,
-            self.dzvar
+            self._dxvar,
+            self._dyvar,
+            self._dzvar
         )
 
     @property
@@ -168,39 +165,39 @@ class Distance3dVariable(AbstractVariable):
     @property
     def columns(self):
         return list(set(
-            self.dxvar.columns +
-            self.dyvar.columns +
-            self.dzvar.columns
+            self._dxvar.columns +
+            self._dyvar.columns +
+            self._dzvar.columns
         ))  
     
-    def evaluate(self, dataset):
-        return self.magnitude_var.evaluate(dataset)
+    def evaluate(self, dataset, cut):
+        return self.magnitude_var.evaluate(dataset, cut)
     
     @property
     def key(self):
         return "Distance3D(%s_%s_%s - %s_%s_%s)"%(
-            self.dxvar.gen.key,
-            self.dyvar.gen.key,
-            self.dzvar.gen.key,
-            self.dxvar.reco.key,
-            self.dyvar.reco.key,
-            self.dzvar.reco.key
+            self._dxvar._var2.key,
+            self._dyvar._var2.key,
+            self._dzvar._var2.key,
+            self._dxvar._var1.key,
+            self._dyvar._var1.key,
+            self._dzvar._var1.key
         )
     
     def __eq__(self, other):
         if type(other) is not Distance3dVariable:
             return False
-        return (self.dxvar == other.dxvar and
-                self.dyvar == other.dyvar and
-                self.dzvar == other.dzvar)
+        return (self._dxvar == other._dxvar and
+                self._dyvar == other._dyvar and
+                self._dzvar == other._dzvar)
     
     def set_collection_name(self, collection_name):
-        self.dxvar.set_collection_name(collection_name)
-        self.dyvar.set_collection_name(collection_name)
-        self.dzvar.set_collection_name(collection_name)
+        self._dxvar.set_collection_name(collection_name)
+        self._dyvar.set_collection_name(collection_name)
+        self._dzvar.set_collection_name(collection_name)
         self.magnitude_var.set_collection_name(collection_name)
 
-class EtaFromXYZVariable(AbstractVariable):
+class EtaFromXYZVariable(VariableBase):
     def __init__(self, x, y, z):
         self._x = x
         self._y = y
@@ -235,14 +232,14 @@ class EtaFromXYZVariable(AbstractVariable):
         self._y.set_collection_name(collection_name)
         self._z.set_collection_name(collection_name)
 
-    def evaluate(self, dataset):
-        xval = self._x.evaluate(dataset)
-        yval = self._y.evaluate(dataset)
-        zval = self._z.evaluate(dataset)
+    def evaluate(self, dataset, cut):
+        xval = self._x.evaluate(dataset, cut)
+        yval = self._y.evaluate(dataset, cut)
+        zval = self._z.evaluate(dataset, cut)
 
         return xyz_to_eta_phi(xval, yval, zval)[0]
     
-class PhiFromXYZVariable(AbstractVariable):
+class PhiFromXYZVariable(VariableBase):
     def __init__(self, x, y, z):
         self._x = x
         self._y = y
@@ -277,9 +274,9 @@ class PhiFromXYZVariable(AbstractVariable):
         self._y.set_collection_name(collection_name)
         self._z.set_collection_name(collection_name)
 
-    def evaluate(self, dataset):
-        xval = self._x.evaluate(dataset)
-        yval = self._y.evaluate(dataset)
-        zval = self._z.evaluate(dataset)
+    def evaluate(self, dataset, cut):
+        xval = self._x.evaluate(dataset, cut)
+        yval = self._y.evaluate(dataset, cut)
+        zval = self._z.evaluate(dataset, cut)
 
         return xyz_to_eta_phi(xval, yval, zval)[1]

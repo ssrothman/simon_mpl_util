@@ -1,51 +1,16 @@
 import copy
 
 from simon_mpl_util.plotting.util.config import lookup_axis_label
-from .Abstract import AbstractVariable
+from .VariableBase import VariableBase
 
-from typing import List
+from typing import List, Sequence, assert_never, override
+import awkward as ak
+import numpy as np
 
-def variable_from_string(name):
-    if 'over' in name:
-        num, denom = name.split('_over_')
-        return RatioVariable(num, denom)
-    elif 'times' in name:
-        var1, var2 = name.split('_times_')
-        return ProductVariable(var1, var2)
-    else:
-        return BasicVariable(name)
+from simon_mpl_util.plotting.typing.Protocols import VariableProtocol
 
-class PrebinnedVariable(AbstractVariable):
-    def __init__(self):
-        pass #stateless
-    
-    @property
-    def _natural_centerline(self):
-        return None
-    
-    @property 
-    def columns(self):
-        return []
-    
-    @property
-    def prebinned(self) -> bool:
-        return True
-    
-    def evaluate(self, dataset):
-        raise RuntimeError("PrebinnedVariable objects are just placeholders and cannot be evaluated. The actual evaluation happens in the cut object.")
-    
-    @property 
-    def key(self):
-        return "PREBINNED"
-    
-    def __eq__(self, other):
-        return isinstance(other, PrebinnedVariable)
-    
-    def set_collection_name(self, collection_name):
-        pass
-
-class ConstantVariable(AbstractVariable):
-    def __init__(self, value):
+class ConstantVariable(VariableBase):
+    def __init__(self, value : float | int):
         self._value = value
 
     @property
@@ -60,24 +25,32 @@ class ConstantVariable(AbstractVariable):
     def columns(self):
         return []
     
-    def evaluate(self, dataset):
-        return self._value
+    def evaluate(self, dataset, cut):
+        mask = cut.evaluate(dataset)
+        if isinstance(mask, ak.Array):
+            val = ak.ones_like(mask) * self._value
+        elif isinstance(mask, np.ndarray):
+            val = np.ones_like(mask) * self._value
+        else: 
+            assert_never(mask)
+
+        return val[mask]
     
     @property
     def key(self):
         return "CONST(%s)"%(self._value)
-    
+        
+    def set_collection_name(self, collection_name):
+        pass #no-op
+
     def __eq__(self, other):
         if type(other) is not ConstantVariable:
             return False
         
         return self._value == other._value
-    
-    def set_collection_name(self, collection_name):
-        pass
 
-class BasicVariable(AbstractVariable):
-    def __init__(self, name, collection_name=None):
+class BasicVariable(VariableBase):
+    def __init__(self, name : str, collection_name: str | None = None):
         self._name = name
         self._collection_name = collection_name
 
@@ -99,8 +72,10 @@ class BasicVariable(AbstractVariable):
         else:
             return [self._collection_name + "." + self._name]
 
-    def evaluate(self, dataset):
-        return dataset.get_column(self._name, self._collection_name)
+    def evaluate(self, dataset, cut):
+        mask = cut.evaluate(dataset)
+        val = dataset.get_column(self._name, self._collection_name)
+        return val[mask]
     
     @property
     def prebinned(self) -> bool:
@@ -126,70 +101,9 @@ class BasicVariable(AbstractVariable):
     def set_collection_name(self, collection_name):
         self._collection_name = collection_name
 
-class ConcatVariable(AbstractVariable):
-    def __init__(self, *vars, keyvar=None):
-        self.vars_ = vars
-        if keyvar is None:
-            print("WARNING: ConcatVariable without key! Automatic labels will fail")
-            self._keyvar = BasicVariable("None")
-        else:
-            self._keyvar = keyvar
-
-    @property
-    def _natural_centerline(self):
-        return self.vars_[0]._natural_centerline
-    
-    @property
-    def prebinned(self) -> bool:
-        return False
-    
-    @staticmethod
-    def build_for_collections(var : AbstractVariable, collections_l : List[str]):
-        vars = []
-        for coll in collections_l:
-            v = copy.deepcopy(var)
-            v.set_collection_name(coll)
-            vars.append(v)
-
-        result = ConcatVariable(*vars, keyvar=var)
-        return result
-
-    @property
-    def columns(self):
-        cols = []
-        for var in self.vars_:
-            cols += var.columns
-        return list(set(cols))
-    
-    def evaluate(self, dataset):
-        import awkward as ak
-
-        arrays = []
-        for var in self.vars_:
-            arrays.append(var.evaluate(dataset))
-        
-        return ak.concatenate(arrays)
-    
-    @property
-    def key(self):
-        return self._keyvar.key
-    
-    def __eq__(self, other):
-        if type(other) is not ConcatVariable:
-            return False
-
-        return self._keyvar == other._keyvar        
-
-    def set_collection_name(self, collection_name):
-        print("WARNING: overwriting collection name for all variables in ConcatVariable object")
-        for var in self.vars_:
-            var.set_collection_name(collection_name)
-        self._keyvar.set_collection_name(collection_name)
-
-
-class AkNumVariable(AbstractVariable):
-    def __init__(self, name):
-        self.name = name
+class AkNumVariable(VariableBase):
+    def __init__(self, var : VariableProtocol):
+        self._var = var
 
     @property
     def _natural_centerline(self):
@@ -197,39 +111,34 @@ class AkNumVariable(AbstractVariable):
     
     @property
     def columns(self):
-        return [self.name]
+        return self._var.columns
 
     @property
     def prebinned(self) -> bool:
         return False
     
-    def evaluate(self, dataset):
-        return dataset.get_aknum_column(self.name)
+    def evaluate(self, dataset, cut):
+        val = self._var.evaluate(dataset, cut)
+        mask = cut.evaluate(dataset)
+        return ak.num(val[mask])
     
     @property
     def key(self):
-        return "N(%s)"%(self.name)
+        return "N(%s)"%(self._var.key)
     
     def __eq__(self, other):
         if type(other) is not AkNumVariable:
             return False
         
-        return self.name == other.name
+        return self._var == other._var
     
     def set_collection_name(self, collection_name):
         raise ValueError("AkNumVariable does not support set_collection_name")
 
-class RatioVariable(AbstractVariable):
-    def __init__(self, num, denom):
-        if type(num) is str:
-            self.num = BasicVariable(num)
-        else:
-            self.num = num
-
-        if type(denom) is str:
-            self.denom = BasicVariable(denom)
-        else:
-            self.denom = denom
+class RatioVariable(VariableBase):
+    def __init__(self, num : VariableProtocol, denom : VariableProtocol):
+        self._num = num
+        self._denom = denom
 
     @property
     def _natural_centerline(self):
@@ -241,36 +150,29 @@ class RatioVariable(AbstractVariable):
     
     @property
     def columns(self):
-        return list(set(self.num.columns + self.denom.columns))
+        return list(set(self._num.columns + self._denom.columns))
 
-    def evaluate(self, dataset):
-        return self.num.evaluate(dataset) / self.denom.evaluate(dataset)
+    def evaluate(self, dataset, cut):
+        return self._num.evaluate(dataset, cut) / self._denom.evaluate(dataset, cut)
 
     @property
     def key(self):
-        return "%s_over_%s"%(self.num.key, self.denom.key)
+        return "%s_over_%s"%(self._num.key, self._denom.key)
     
     def __eq__(self, other):
         if type(other) is not RatioVariable:
             return False
         
-        return self.num == other.num and self.denom == other.denom
+        return self._num == other._num and self._denom == other._denom
 
     def set_collection_name(self, collection_name):
-        self.num.set_collection_name(collection_name)
-        self.denom.set_collection_name(collection_name)
+        self._num.set_collection_name(collection_name)
+        self._denom.set_collection_name(collection_name)
 
-class ProductVariable(AbstractVariable):
-    def __init__(self, var1, var2):
-        if type(var1) is str:
-            self.var1 = BasicVariable(var1)
-        else:
-            self.var1 = var1
-
-        if type(var2) is str:
-            self.var2 = BasicVariable(var2)
-        else:
-            self.var2 = var2
+class ProductVariable(VariableBase):
+    def __init__(self, var1 : VariableProtocol, var2 : VariableProtocol):
+        self._var1 = var1
+        self._var2 = var2
 
     @property
     def _natural_centerline(self):
@@ -282,34 +184,29 @@ class ProductVariable(AbstractVariable):
     
     @property
     def columns(self):
-        return self.var1.columns + self.var2.columns
+        return self._var1.columns + self._var2.columns
 
-    def evaluate(self, dataset):
-        return self.var1.evaluate(dataset) * self.var2.evaluate(dataset)
+    def evaluate(self, dataset, cut):
+        return self._var1.evaluate(dataset, cut) * self._var2.evaluate(dataset, cut)
 
     @property
     def key(self):
-        return "%s_times_%s"%(self.var1.key, self.var2.key)
+        return "%s_times_%s"%(self._var1.key, self._var2.key)
     
     def __eq__(self, other):
         if type(other) is not ProductVariable:
             return False
         
-        return self.var1 == other.var1 and self.var2 == other.var2
+        return self._var1 == other._var1 and self._var2 == other._var2
 
     def set_collection_name(self, collection_name):
-        self.var1.set_collection_name(collection_name)
-        self.var2.set_collection_name(collection_name)
-
-class DifferenceVariable(AbstractVariable):
-    def __init__(self, gen, reco):
-        self.gen = gen
-        self.reco = reco
-
-        if type(gen) is str:
-            self.gen = variable_from_string(gen)
-        if type(reco) is str:
-            self.reco = variable_from_string(reco)
+        self._var1.set_collection_name(collection_name)
+        self._var2.set_collection_name(collection_name)
+        
+class DifferenceVariable(VariableBase):
+    def __init__(self, var1 : VariableProtocol, var2 : VariableProtocol):
+        self._var1 = var1
+        self._var2 = var2
 
     @property
     def _natural_centerline(self):
@@ -321,33 +218,29 @@ class DifferenceVariable(AbstractVariable):
     
     @property
     def columns(self):
-        return list(set(self.gen.columns + self.reco.columns))
+        return list(set(self._var1.columns + self._var2.columns))
 
-    def evaluate(self, dataset):
-        return self.reco.evaluate(dataset) - self.gen.evaluate(dataset)
+    def evaluate(self, dataset, cut):
+        return self._var2.evaluate(dataset, cut) - self._var1.evaluate(dataset, cut)
 
     @property
     def key(self):
-        return "%s_minus_%s"%(self.reco.key, self.gen.key)
+        return "%s_minus_%s"%(self._var2.key, self._var1.key)
     
     def __eq__(self, other):
         if type(other) is not DifferenceVariable:
             return False
-        return self.gen == other.gen and self.reco == other.reco
+        
+        return self._var1 == other._var1 and self._var2 == other._var2
 
     def set_collection_name(self, collection_name):
-        self.gen.set_collection_name(collection_name)
-        self.reco.set_collection_name(collection_name)
+        self._var1.set_collection_name(collection_name)
+        self._var2.set_collection_name(collection_name)
 
-class SumVariable(AbstractVariable):
-    def __init__(self, x1, x2):
-        self.x1 = x1
-        self.x2 = x2
-
-        if type(x1) is str:
-            self.x1 = variable_from_string(x1)
-        if type(x2) is str:
-            self.x2 = variable_from_string(x2)
+class SumVariable(VariableBase):
+    def __init__(self, var1 : VariableProtocol, var2 : VariableProtocol):
+        self._var1 = var1
+        self._var2 = var2
 
     @property
     def _natural_centerline(self):
@@ -359,32 +252,29 @@ class SumVariable(AbstractVariable):
     
     @property
     def columns(self):
-        return list(set(self.x1.columns + self.x2.columns))
+        return list(set(self._var1.columns + self._var2.columns))
 
-    def evaluate(self, dataset):
-        return self.x1.evaluate(dataset) + self.x2.evaluate(dataset)
+    def evaluate(self, dataset, cut):
+        return self._var1.evaluate(dataset, cut) + self._var2.evaluate(dataset, cut)
 
     @property
     def key(self):
-        return "%s_plus_%s"%(self.x1.key, self.x2.key)
+        return "%s_plus_%s"%(self._var1.key, self._var2.key)
     
     def __eq__(self, other):
         if type(other) is not SumVariable:
             return False
-        return self.x1 == other.x1 and self.x2 == other.x2
+        return self._var1 == other._var1 and self._var2 == other._var2
 
     def set_collection_name(self, collection_name):
-        self.x1.set_collection_name(collection_name)
-        self.x2.set_collection_name(collection_name)
+        self._var1.set_collection_name(collection_name)
+        self._var2.set_collection_name(collection_name)
 
-class CorrectionlibVariable(AbstractVariable):
-    def __init__(self, var_l, path, key):
-        self.var_l = []
+class CorrectionlibVariable(VariableBase):
+    def __init__(self, var_l : Sequence[VariableProtocol], path : str, key : str):
+        self._vars = []
         for var in var_l:
-            if type(var) is str:
-                self.var_l.append(variable_from_string(var))
-            else:
-                self.var_l.append(var)
+            self._vars.append(var)
 
         from correctionlib import CorrectionSet
         cset = CorrectionSet.from_file(path)
@@ -392,8 +282,8 @@ class CorrectionlibVariable(AbstractVariable):
             print("Error: Correctionlib key '%s' not found in %s"%(key, path))
             print("Available keys: %s"%list(cset.keys()))
             raise ValueError("Correctionlib key not found")
-        self.eval = cset[key].evaluate
-        self.csetkey = key
+        self._eval = cset[key].evaluate
+        self._csetkey = key
 
     @property
     def _natural_centerline(self):
@@ -406,33 +296,45 @@ class CorrectionlibVariable(AbstractVariable):
     @property
     def columns(self):
         cols = []
-        for var in self.var_l:
+        for var in self._vars:
             cols += var.columns
         return list(set(cols))
 
-    def evaluate(self, dataset):
+    def evaluate(self, dataset, cut):
         args = []
-        for var in self.var_l:
-            args.append(var.evaluate(dataset))
+        for var in self._vars:
+            args.append(var.evaluate(dataset, cut))
 
-        return self.eval(*args)
+        return self._eval(*args)
 
     @property
     def key(self):
-        return "CORRECTIONLIB(%s)"%(self.csetkey)
-
-    def set_collection_name(self, collection_name):
-        for var in self.var_l:
-            var.set_collection_name(collection_name)
+        return "CORRECTIONLIB(%s)"%(self._csetkey) 
     
-class UFuncVariable(AbstractVariable):
-    def __init__(self, var, ufunc):
-        if type(var) is str:
-            self.var = variable_from_string(var)
-        else:
-            self.var = var
+    def set_collection_name(self, collection_name):
+        for var in self._vars:
+            var.set_collection_name(collection_name)
 
-        self.ufunc = ufunc
+    def __eq__(self, other):
+        if type(other) is not CorrectionlibVariable:
+            return False
+        
+        if self._csetkey != other._csetkey:
+            return False
+
+        if len(self._vars) != len(other._vars):
+            return False
+
+        for i in range(len(self._vars)):
+            if self._vars[i] != other._vars[i]:
+                return False
+
+        return True
+    
+class UFuncVariable(VariableBase):
+    def __init__(self, var : VariableProtocol, ufunc):
+        self._var = var
+        self._ufunc = ufunc
 
     @property
     def _natural_centerline(self):
@@ -444,24 +346,26 @@ class UFuncVariable(AbstractVariable):
     
     @property
     def columns(self):
-        return self.var.columns
+        return self._var.columns
 
-    def evaluate(self, dataset):
-        return self.ufunc(self.var.evaluate(dataset))
+    def evaluate(self, dataset, cut):
+        return self._ufunc(self._var.evaluate(dataset, cut))
 
     @property
     def key(self):
-        return 'UFUNC%s(%s)'%(self.ufunc.__name__, self.var.key)
+        return 'UFUNC%s(%s)'%(self._ufunc.__name__, self._var.key)
     
     def __eq__(self, other):
         if type(other) is not UFuncVariable:
             return False
-        return self.var == other.var and self.ufunc == other.ufunc
+        
+        return self._var == other._var and self._ufunc == other._ufunc
 
     def set_collection_name(self, collection_name):
-        self.var.set_collection_name(collection_name)
+        self._var.set_collection_name(collection_name)
 
-class RateVariable(AbstractVariable):
+'''
+class RateVariable(VariableBase):
     def __init__(self, binaryfield, wrt):
         if type(binaryfield) is str:
             self.binaryfield = BasicVariable(binaryfield)
@@ -501,3 +405,64 @@ class RateVariable(AbstractVariable):
     def set_collection_name(self, collection_name):
         self.binaryfield.set_collection_name(collection_name)
         self.wrt.set_collection_name(collection_name)
+'''
+
+class ConcatVariable(VariableBase):
+    def __init__(self, vars : Sequence[VariableProtocol], keyvar : VariableProtocol | None = None):
+        self._vars = vars
+        if keyvar is None:
+            print("WARNING: ConcatVariable without key! Automatic labels will fail")
+            self._keyvar = BasicVariable("NoKey")
+        else:
+            self._keyvar = keyvar
+
+    @property
+    def _natural_centerline(self):
+        return self._keyvar.centerline
+
+    @property
+    def prebinned(self) -> bool:
+        return False
+    
+    @staticmethod
+    def build_for_collections(var : VariableProtocol, collections_l : List[str]):
+        vars = []
+        for coll in collections_l:
+            v = copy.deepcopy(var)
+            v.set_collection_name(coll)
+            vars.append(v)
+
+        result = ConcatVariable(vars, keyvar=var)
+        return result
+
+    @property
+    def columns(self):
+        cols = []
+        for var in self._vars:
+            cols += var.columns
+        return list(set(cols))
+    
+    def evaluate(self, dataset, cut):
+        arrays = []
+        for var in self._vars:
+            arrays.append(var.evaluate(dataset, cut))
+        
+        return ak.concatenate(arrays)
+    
+    @property
+    def key(self):
+        return self._keyvar.key
+    
+    def __eq__(self, other):
+        if type(other) is not ConcatVariable:
+            return False
+
+        return self._keyvar == other._keyvar        
+
+    def set_collection_name(self, collection_name):
+        print("WARNING: overwriting collection name for all variables in ConcatVariable object")
+        
+        for var in self._vars:
+            var.set_collection_name(collection_name)
+
+        self._keyvar.set_collection_name(collection_name)

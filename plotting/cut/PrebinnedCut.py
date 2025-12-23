@@ -1,4 +1,4 @@
-from simon_mpl_util.plotting.plottables.Abstract import AbstractPrebinnedDataset
+from simon_mpl_util.plotting.typing.Protocols import PrebinnedDatasetAccessProtocol
 from simon_mpl_util.plotting.util.config import lookup_axis_label
 
 from simon_mpl_util.util.text import strip_units
@@ -6,39 +6,43 @@ from simon_mpl_util.util.AribtraryBinning import ArbitraryBinning
 
 import numpy as np
 
-from typing import List
+from typing import List, Sequence
 
-from .Abstract import PrebinnedOperation
+from .CutBase import PrebinnedOperationBase
 
-class NoopOperation(PrebinnedOperation):
+class NoopOperation(PrebinnedOperationBase):
+    def __init__(self):
+        pass #stateless
+
     @property
     def key(self):
         return "NOOP"
     
-    def _auto_plottext(self):
+    @property
+    def _auto_label(self):
         return ''
 
     def __eq__(self, other):
         return isinstance(other, NoopOperation)
 
     def evaluate(self, dataset):
-        if not isinstance(dataset, AbstractPrebinnedDataset):
-            raise TypeError("NoopOperation can only be applied to PrebinnedDataset")
+        dataset = self.ensure_valid_dataset(dataset)   
         
         return dataset.data
 
     def _compute_resulting_binning(self, binning : ArbitraryBinning) -> ArbitraryBinning:
         return binning
 
-class ProjectionOperation(PrebinnedOperation):
-    def __init__(self, axes : List[str]):
+class ProjectionOperation(PrebinnedOperationBase):
+    def __init__(self, axes : Sequence[str]):
         self._axes = axes
 
     @property
     def key(self):
         return "PROJECT(%s)" % "-".join(str(ax) for ax in self._axes)
 
-    def _auto_plottext(self):
+    @property
+    def _auto_label(self):
         names = []
         for ax in self._axes:
             names.append(strip_units(lookup_axis_label(ax)))
@@ -50,9 +54,7 @@ class ProjectionOperation(PrebinnedOperation):
         return self._axes == other._axes
 
     def evaluate(self, dataset):
-        if not isinstance(dataset, AbstractPrebinnedDataset):
-            raise TypeError("ProjectionOperation can only be applied to PrebinnedDataset")
-        
+        dataset = self.ensure_valid_dataset(dataset)   
         return dataset.project(self._axes)
 
     def _compute_resulting_binning(self, binning : ArbitraryBinning) -> ArbitraryBinning:
@@ -62,8 +64,8 @@ class ProjectionOperation(PrebinnedOperation):
             empty_data, result = result.project_out(empty_data, ax)
         return result
 
-class SliceOperation(PrebinnedOperation):
-    def __init__(self, edges):
+class SliceOperation(PrebinnedOperationBase):
+    def __init__(self, edges : dict[str, Sequence]):
         self._edges = edges
 
     @property
@@ -75,7 +77,8 @@ class SliceOperation(PrebinnedOperation):
             slicestr = slicestr[:-1]
         return "SLICE(%s)" % slicestr
     
-    def _auto_plottext(self):
+    @property
+    def _auto_label(self):
         texts = []
         for name, edges in self._edges.items():
             low = edges[0]
@@ -95,16 +98,14 @@ class SliceOperation(PrebinnedOperation):
         return self.key == other.key
     
     def evaluate(self, dataset):
-        if not isinstance(dataset, AbstractPrebinnedDataset):
-            raise TypeError("SliceOperation can only be applied to PrebinnedDataset")
-        
+        dataset = self.ensure_valid_dataset(dataset)   
         return dataset.slice(self._edges)
     
     def _compute_resulting_binning(self, binning : ArbitraryBinning) -> ArbitraryBinning:
-        return binning.get_sliced_binning(**self._edges)
+        return binning.get_sliced_binning(self._edges)
 
-class ProjectAndSliceOperation(PrebinnedOperation):
-    def __init__(self, axes : List[str], edges):
+class ProjectAndSliceOperation(PrebinnedOperationBase):
+    def __init__(self, axes : Sequence[str], edges: dict[str, Sequence]):
         self._projection = ProjectionOperation(axes)
         self._slice = SliceOperation(edges)
 
@@ -117,10 +118,11 @@ class ProjectAndSliceOperation(PrebinnedOperation):
             return False
         return self._projection == other._projection and self._slice == other._slice
 
-    def _auto_plottext(self):
+    @property
+    def _auto_label(self):
         texts = []
-        proj_text = self._projection._auto_plottext()
-        slice_text = self._slice._auto_plottext()
+        proj_text = self._projection._auto_label
+        slice_text = self._slice._auto_label
         if proj_text != '':
             texts.append(proj_text)
         if slice_text != '':
@@ -128,15 +130,12 @@ class ProjectAndSliceOperation(PrebinnedOperation):
         return '\n'.join(texts)
 
     def evaluate(self, dataset):
-        if not isinstance(dataset, AbstractPrebinnedDataset):
-            raise TypeError("ProjectAndSliceOperation can only be applied to PrebinnedDataset")
+        dataset = self.ensure_valid_dataset(dataset)   
         
         projdata = self._projection.evaluate(dataset)
-        proj_dset = type(dataset)(
-            "TMP",
-            projdata,
-            self._projection.resulting_binning(dataset.binning)
-        )
+        projbinning = self._projection.resulting_binning(dataset.binning)
+        proj_dset = dataset._dummy_dset(projdata, projbinning)
+
         return self._slice.evaluate(proj_dset)
     
     def _compute_resulting_binning(self, binning : ArbitraryBinning) -> ArbitraryBinning:

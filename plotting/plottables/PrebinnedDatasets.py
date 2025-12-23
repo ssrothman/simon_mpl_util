@@ -1,11 +1,33 @@
-from .Abstract import AbstractPrebinnedDataset
+from simon_mpl_util.plotting.typing.Protocols import PrebinnedDatasetAccessProtocol
+from .DatasetBase import SingleDatasetBase
+
 from simon_mpl_util.util.AribtraryBinning import ArbitraryBinning
 import numpy as np
-from typing import List
+from typing import Sequence, Tuple
 
-class ValCovPairDataset(AbstractPrebinnedDataset):
-    def __init__(self, key : str, data : tuple[np.ndarray, np.ndarray], binning : ArbitraryBinning):
-        super().__init__(key, data, binning)
+class PrebinnedDatasetBase(SingleDatasetBase):
+    _data : np.ndarray | Tuple[np.ndarray, np.ndarray]
+    _binning : ArbitraryBinning
+    
+    @property
+    def data(self):
+        return self._data
+
+    @property
+    def binning(self):
+        return self._binning
+
+class ValCovPairDataset(PrebinnedDatasetBase):
+    def __init__(self, key : str, color : str, label : str,
+                 data : tuple[np.ndarray, np.ndarray], 
+                 binning : ArbitraryBinning):
+        self._key = key
+        self._color = color
+        self._label = label
+
+        self._data = data
+        self._binning = binning
+
 
     @property
     def quantitytype(self):
@@ -18,12 +40,8 @@ class ValCovPairDataset(AbstractPrebinnedDataset):
     @property
     def cov(self):
         return self._data[1]
-
-    @property
-    def is_stack(self) -> bool:
-        return False
     
-    def project(self, axes : List[str]):
+    def project(self, axes : Sequence[str]):
         result = self.values
         projbinning = self._binning
         for ax in axes:
@@ -41,11 +59,18 @@ class ValCovPairDataset(AbstractPrebinnedDataset):
         covresult = self._binning.get_slice_cov2d(self.cov, **edges)
         return result, covresult
 
-class CovmatDataset(AbstractPrebinnedDataset):
-    def __init__(self, key:str, covmat : np.ndarray, binning : ArbitraryBinning):
-        super().__init__(key, covmat, binning)
+    def _dummy_dset(self, data, binning) -> PrebinnedDatasetAccessProtocol:
+        return ValCovPairDataset("", '', '', data, binning)
+    
+class CovmatDataset(PrebinnedDatasetBase):
+    def __init__(self, key:str, color : str, label : str,
+                 covmat : np.ndarray, binning : ArbitraryBinning):
+        self._key = key
+        self._color = color
+        self._label = label
 
         self._covmat = covmat
+        self._binning = binning
     
     @property
     def quantitytype(self):
@@ -54,12 +79,8 @@ class CovmatDataset(AbstractPrebinnedDataset):
     @property
     def covmat(self):
         return self._covmat
-    
-    @property
-    def is_stack(self) -> bool:
-        return False
-    
-    def project(self, axes : List[str]):
+        
+    def project(self, axes : Sequence[str]):
         result = self.covmat
         projbinning = self._binning
         for ax in axes:
@@ -70,3 +91,6 @@ class CovmatDataset(AbstractPrebinnedDataset):
     def slice(self, edges : dict):
         result = self._binning.get_slice_cov2d(self.covmat, **edges)
         return result
+    
+    def _dummy_dset(self, data, binning) -> PrebinnedDatasetAccessProtocol:
+        return CovmatDataset("", '', '', data, binning)
