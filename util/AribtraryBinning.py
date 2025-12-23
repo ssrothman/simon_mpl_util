@@ -980,7 +980,6 @@ class ArbitraryBinning:
         :return: A tuple containing the projected data and a new ArbitraryBinning instance representing the new binning structure
         :rtype: Tuple[ndarray[Any, Any], ArbitraryBinning]
         '''
-
         #for consistency check conservation of total sum
         startsum = data.sum(axis=None)
 

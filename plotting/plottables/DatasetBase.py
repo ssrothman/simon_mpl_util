@@ -115,7 +115,7 @@ class DatasetBase(ABC):
 
     @property
     def num_events(self):
-        if self._override_nevts is not None:
+        if hasattr(self, '_override_nevts') and self._override_nevts is not None:
             return self._override_nevts
         else:
             if hasattr(self, 'num_rows'):
@@ -133,7 +133,7 @@ class DatasetBase(ABC):
         if own_style:
             mpl_kwargs['color'] = self.color
 
-        call_histplot_ratio_function(
+        return call_histplot_ratio_function(
             H1, H2,
             axis,
             ax = ax,
@@ -238,7 +238,7 @@ class SingleDatasetBase(DatasetBase):
                 ax : matplotlib.axes.Axes,
                 own_style : bool,
                 fillbetween : Union[float, None],
-                **mpl_kwargs) -> Any:
+                **mpl_kwargs) -> Tuple[Tuple[Any, Any], Any]:
 
         self.fill_hist(variable, cut, weight, axis)
 
@@ -246,7 +246,7 @@ class SingleDatasetBase(DatasetBase):
             mpl_kwargs['label'] = self.label
             mpl_kwargs['color'] = self.color
 
-        call_histplot_function(
+        artist, vals = call_histplot_function(
             self._H, 
             axis,
             ax = ax,
@@ -254,11 +254,19 @@ class SingleDatasetBase(DatasetBase):
             fillbetween = fillbetween,
             **mpl_kwargs
         )
-        return self._H
+        return (artist, vals), self._H
     
 class DatasetStackBase(DatasetBase):
     _datasets : Sequence[BaseDatasetProtocol]
     
+    @property
+    def binning(self) -> ArbitraryBinning:
+        if len(self._datasets) == 0:
+            raise RuntimeError("DatasetStack.binning: No datasets in stack!")
+        if not isinstance(self._datasets[0], PrebinnedDatasetAccessProtocol):
+            raise RuntimeError("DatasetStack.binning: Datasets in stack are not prebinned datasets!")
+        return self._datasets[0].binning
+
     @property
     def is_stack(self) -> bool:
         return True
@@ -282,8 +290,12 @@ class DatasetStackBase(DatasetBase):
         return np.sum([d.xsec for d in self._datasets])
 
     @property
+    def num_rows(self):
+        return np.min([d.num_rows for d in self._datasets])
+
+    @property
     def isMC(self):
-        return np.all([d.isMC for d in self._datasets])
+        return bool(np.all([d.isMC for d in self._datasets]))
 
     def compute_weight(self, target_lumi):
         for d in self._datasets:
@@ -319,7 +331,7 @@ class DatasetStackBase(DatasetBase):
                        ax : matplotlib.axes.Axes,
                        own_style : bool,
                        fillbetween : Union[float, None],
-                       **mpl_kwargs) -> Tuple[Any, Any]:
+                       **mpl_kwargs) -> Tuple[Any, Tuple[Any, Any]]:
         
         if len(self._datasets) == 0:
             raise RuntimeError("DatasetStack.plot_hist: No datasets in stack!")
@@ -345,13 +357,13 @@ class DatasetStackBase(DatasetBase):
                 )
                 prev = vals
 
-            return self.H 
+            return (artist, vals), self.H  # pyright: ignore[reportPossiblyUnboundVariable]
         else:   
-            call_histplot_function(
+            (artist, vals) = call_histplot_function(
                 self.H, 
                 ax = ax,
                 density=density,
                 fillbetween = fillbetween,
                 **mpl_kwargs
             )   
-            return self.H
+            return (artist, vals), self.H

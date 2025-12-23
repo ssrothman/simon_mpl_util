@@ -71,7 +71,7 @@ class PrebinnedOperationBase(CutBase):
     
     def ensure_valid_dataset(self, dataset):
         if not isinstance(dataset, PrebinnedDatasetAccessProtocol):
-            raise TypeError("UnbinnedCut can only be applied to UnbinnedDataset")
+            raise TypeError("PrebinnedCut can only be applied to PrebinnedDataset")
         return dataset
 
     def resulting_binning(self, binning : ArbitraryBinning) -> ArbitraryBinning:

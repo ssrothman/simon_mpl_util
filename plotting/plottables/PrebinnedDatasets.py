@@ -8,7 +8,7 @@ from typing import Sequence, Tuple
 class PrebinnedDatasetBase(SingleDatasetBase):
     _data : np.ndarray | Tuple[np.ndarray, np.ndarray]
     _binning : ArbitraryBinning
-    
+
     @property
     def data(self):
         return self._data
@@ -45,11 +45,15 @@ class ValCovPairDataset(PrebinnedDatasetBase):
         result = self.values
         projbinning = self._binning
         for ax in axes:
+            #print("Projecting out axis:", ax)  
+            #print("result.sum() = ", np.sum(result))
             result, projbinning = projbinning.project_out(result, ax)
 
         covresult = self.cov
         b2 = self._binning
         for ax in axes:
+            #print("Projecting out axis from cov:", ax)
+            #print("covresult.sum() = ", np.sum(covresult))
             covresult, b2 = b2.project_out_cov2d(covresult, ax)
 
         return result, covresult
@@ -61,6 +65,10 @@ class ValCovPairDataset(PrebinnedDatasetBase):
 
     def _dummy_dset(self, data, binning) -> PrebinnedDatasetAccessProtocol:
         return ValCovPairDataset("", '', '', data, binning)
+    
+    @property
+    def num_rows(self) -> int:
+        return np.sum(self.data[0])
     
 class CovmatDataset(PrebinnedDatasetBase):
     def __init__(self, key:str, color : str | None, label : str | None,
@@ -96,3 +104,7 @@ class CovmatDataset(PrebinnedDatasetBase):
     
     def _dummy_dset(self, data, binning) -> PrebinnedDatasetAccessProtocol:
         return CovmatDataset("", '', '', data, binning)
+    
+    @property
+    def num_rows(self) -> int:
+        return np.sum(self.data)

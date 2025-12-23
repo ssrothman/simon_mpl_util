@@ -255,6 +255,10 @@ class PrebinnedBinning(BinningBase):
     def has_custom_labels(self) -> bool:
         return False
     
+    @property
+    def label_lookup(self) -> dict[str, str]:
+        return {}
+
     def build_prebinned_axis(self,
                              dataset : Any,
                              cut : CutProtocol) -> ArbitraryBinning:

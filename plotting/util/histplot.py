@@ -5,6 +5,7 @@ import numpy as np
 from simon_mpl_util.util.AribtraryBinning import ArbitraryBinning
 
 def _call_errorbar(ax, x, y, xerr, yerr, **kwargs):
+    
     return ax.errorbar(
         x, y, xerr = xerr, yerr = yerr,
         fmt = 'o', markersize=4, capsize=1, 
@@ -149,7 +150,7 @@ def _simon_histplot_ratio(vals_num, errs_num,
 def simon_histplot_ratio_arbitrary(num, denom,
                                    binning : ArbitraryBinning,
                                    ax=None,
-                                   density=False, pulls=False, **kwargs):
+                                   density=False, pulls=False, **kwargs):    
     vals_num, cov_num = num
     vals_denom, cov_denom = denom
 

@@ -31,6 +31,8 @@ class ConstantVariable(VariableBase):
             val = ak.ones_like(mask) * self._value
         elif isinstance(mask, np.ndarray):
             val = np.ones_like(mask) * self._value
+        elif isinstance(mask, slice):
+            val = np.array([self._value])
         else: 
             assert_never(mask)
 

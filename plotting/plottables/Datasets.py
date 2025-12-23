@@ -19,14 +19,14 @@ from .DatasetBase import SingleDatasetBase, DatasetStackBase
 from simon_mpl_util.plotting.typing.Protocols import BaseDatasetProtocol
 
 class DatasetStack(DatasetStackBase):
-    def __init__(self, key : str, color : str, label : str, datasets : list[BaseDatasetProtocol]):
+    def __init__(self, key : str, color : str | None, label : str, datasets : list[BaseDatasetProtocol]):
         self._key = key
         self._color = color
         self._label = label
         self._datasets = datasets
         
 class NanoEventsDataset(SingleDatasetBase):
-    def __init__(self, key : str, color : str, label : str, fname, **options):
+    def __init__(self, key : str, color : str | None, label : str, fname, **options):
         self._key = key
         self._color = color
         self._label = label
@@ -64,7 +64,7 @@ class NanoEventsDataset(SingleDatasetBase):
         return len(self._events)
     
 class ParquetDataset(SingleDatasetBase):
-    def __init__(self, key : str, color : str, label : str, path):
+    def __init__(self, key : str, color : str | None, label : str, path):
         self._key = key
         self._color = color
         self._label = label

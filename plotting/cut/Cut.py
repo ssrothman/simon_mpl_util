@@ -17,7 +17,6 @@ class NoCut(UnbinnedCutBase):
         return []
 
     def evaluate(self, dataset):
-        dataset = self.ensure_valid_dataset(dataset)
         return slice(None)
         
     @property

@@ -1,6 +1,6 @@
 from simon_mpl_util.plotting.util.config import config, check_auto_logx
 
-from simon_mpl_util.plotting.typing.Protocols import CutProtocol, VariableProtocol, BaseDatasetProtocol, BaseBinningProtocol, AutoBinningProtocol, DefaultBinningProtocol, PrebinnedBinningProtocol, BasicBinningProtocol
+from simon_mpl_util.plotting.typing.Protocols import CutProtocol, PrebinnedOperationProtocol, VariableProtocol, BaseDatasetProtocol, BaseBinningProtocol, AutoBinningProtocol, DefaultBinningProtocol, PrebinnedBinningProtocol, BasicBinningProtocol
 
 from simon_mpl_util.plotting.util.common import setup_canvas, add_cms_legend, savefig, add_text, draw_legend, make_oneax, make_axes_withpad, get_artist_color, make_fancy_prebinned_labels, label_from_binning
 
@@ -12,7 +12,7 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 
-from typing import List, Union
+from typing import List, Sequence, Tuple, Union
 
 def plot_histogram(variable_: Union[VariableProtocol, List[VariableProtocol]], 
                    cut_: Union[CutProtocol, List[CutProtocol]], 
@@ -37,7 +37,8 @@ def plot_histogram(variable_: Union[VariableProtocol, List[VariableProtocol]],
     if labels_ is None:
         labels_ = ['']
 
-    variable, cut, weight, dataset, labels = ensure_same_length(variable_, cut_, weight_, dataset_, labels_)
+    bigtuple : Tuple[List[VariableProtocol], List[CutProtocol], List[VariableProtocol], List[BaseDatasetProtocol], List[str]] = ensure_same_length(variable_, cut_, weight_, dataset_, labels_)  # pyright: ignore[reportAssignmentType]
+    variable, cut, weight, dataset, labels = bigtuple
 
     #resolve auto logx BEFORE building axis for unbinned variables
     if logx is None and not variable[0].prebinned:
@@ -69,6 +70,8 @@ def plot_histogram(variable_: Union[VariableProtocol, List[VariableProtocol]],
     elif isinstance(binning, DefaultBinningProtocol):
         axis = binning.build_default_axis(variable[0])
     elif isinstance(binning, PrebinnedBinningProtocol):
+        if not isinstance(cut[0], PrebinnedOperationProtocol):
+            raise RuntimeError("When using PrebinnedBinning, cut must be PrebinnedOperation")
         axis = binning.build_prebinned_axis(dataset[0], cut[0])
     elif isinstance(binning, BasicBinningProtocol):
         axis = binning.build_axis(variable[0])
@@ -120,9 +123,6 @@ def plot_histogram(variable_: Union[VariableProtocol, List[VariableProtocol]],
         which_ref = which_data
 
         for i in range(len(variable)):
-            if i == which_data:
-                continue
-
             dataset[i].compute_weight(dataset[which_data].lumi)
     else:
         isdata = False
@@ -151,7 +151,7 @@ def plot_histogram(variable_: Union[VariableProtocol, List[VariableProtocol]],
         if style_from_dset and d.label is not None:
             nolegend = False #force legend if dataset has label
 
-        (artist, _) , H = d._plot_histogram(
+        artist, H = d.plot_hist(
             v, c, w, axis, 
             density, ax_main, 
             style_from_dset or (not d.isMC),
@@ -177,7 +177,7 @@ def plot_histogram(variable_: Union[VariableProtocol, List[VariableProtocol]],
             if i == which_ref:
                 continue
 
-            _, ratiovals, ratioerrs = d._plot_ratio(
+            _, ratiovals, ratioerrs = d.plot_hist_ratio(
                 Hnom, Hs[i],
                 axis,
                 density = density,
@@ -252,7 +252,12 @@ def plot_histogram(variable_: Union[VariableProtocol, List[VariableProtocol]],
         ax_main.set_yscale('log')
 
     if variable[0].centerline is not None:
-        ax_main.axvline(variable[0].centerline, color='k', linestyle='dashed')
+        cls = variable[0].centerline
+        if isinstance(cls, Sequence):
+            for cl in cls:
+                ax_main.axvline(cl, color='k', linestyle='dashed')
+        else:
+            ax_main.axvline(cls, color='k', linestyle='dashed')
 
     if do_ratiopad:
         if pulls:
@@ -294,18 +299,23 @@ def plot_histogram(variable_: Union[VariableProtocol, List[VariableProtocol]],
     elif type(axis) is ArbitraryBinning:
         ax2 = make_fancy_prebinned_labels(
             ax_main,
-            ax_pad if do_ratiopad else None, # pyright: ignore[reportPossiblyUnboundVariable]
-            axis
+            axis,
+            which = 'x',
+            skip_labels = do_ratiopad
         )
+        if do_ratiopad:
+            make_fancy_prebinned_labels(
+                ax_pad, # pyright: ignore[reportPossiblyUnboundVariable]
+                axis,
+                which = 'x',
+                skip_labels = False
+            )
 
     add_text(ax_main, cut, extratext)
 
     draw_legend(ax_main, nolegend)
 
     fig.tight_layout()
-
-    #print(ax2.get_xlim())
-    #print(ax_main.get_xlim())
 
     if output_folder is not None:
         if output_prefix is None:

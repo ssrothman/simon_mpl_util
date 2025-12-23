@@ -147,10 +147,6 @@ class BaseDatasetProtocol(Protocol):
         ...
 
     @property
-    def num_events(self) -> float:
-        ...
-
-    @property
     def lumi(self) -> float:
         ...
     
@@ -161,7 +157,11 @@ class BaseDatasetProtocol(Protocol):
     @property
     def isMC(self) -> bool:
         ...
-    
+        
+    @property
+    def num_rows(self) -> int:
+        ...
+
     def compute_weight(self, target_lumi : float) -> None:
         ...
 
@@ -181,7 +181,7 @@ class BaseDatasetProtocol(Protocol):
                        ax : matplotlib.axes.Axes,
                        own_style : bool,
                        fillbetween : Union[float, None],
-                       **mpl_kwargs) -> Tuple[Any, Any]:
+                       **mpl_kwargs) -> Tuple[Tuple[Any, Any], Any]:
         ...
 
     def plot_hist_ratio(self,
@@ -191,7 +191,7 @@ class BaseDatasetProtocol(Protocol):
                     density : bool,
                     ax : matplotlib.axes.Axes,
                     own_style : bool,
-                    **mpl_kwargs):
+                    **mpl_kwargs) -> Tuple[Any, Any, Any]:
         ...
 
 @runtime_checkable
@@ -201,11 +201,11 @@ class UnbinnedDatasetAccessProtocol(Protocol):
 
     def get_column(self, column_name: str, collection_name: str | None) -> np.ndarray | ak.Array:
         ...
-            
+                   
     @property
     def num_rows(self) -> int:
         ...
-
+ 
 @runtime_checkable
 class PrebinnedDatasetAccessProtocol(Protocol):
     @property

@@ -32,3 +32,7 @@ class PrebinnedVariable(VariableBase):
     @override    
     def set_collection_name(self, collection_name):
         raise ValueError("PrebinnedVariable does not support set_collection_name")
+
+    @override
+    def __eq__(self, other) -> bool:
+        return isinstance(other, PrebinnedVariable)

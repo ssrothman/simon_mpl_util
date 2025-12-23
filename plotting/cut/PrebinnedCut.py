@@ -59,7 +59,7 @@ class ProjectionOperation(PrebinnedOperationBase):
 
     def _compute_resulting_binning(self, binning : ArbitraryBinning) -> ArbitraryBinning:
         result = binning
-        empty_data = np.empty(binning.total_size)
+        empty_data = np.zeros(binning.total_size)
         for ax in self._axes:
             empty_data, result = result.project_out(empty_data, ax)
         return result
