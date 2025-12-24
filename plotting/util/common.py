@@ -87,17 +87,19 @@ def check_ticklabel_overlap(ax : matplotlib.axes.Axes) -> bool:
 def make_fancy_prebinned_labels(ax : matplotlib.axes.Axes, 
                                 axis : ArbitraryBinning,
                                 which : Literal['x', 'y']= 'x',
-                                skip_labels : bool = False):
+                                skip_labels : bool = False,
+                                fontsize_offset : int = 0,
+                                fallback_rotation : float = 0):
     
     original_xlim = ax.get_xlim()
     original_ylim = ax.get_ylim()
 
     cfg = config['fancy_prebinned_labels']
     if not cfg['enabled']:
-        return #short circuit if not enabled
+        return fontsize_offset, fallback_rotation #short circuit if not enabled
     
     if axis.Nax > cfg['max_ndim'] or axis.Nax == 1:
-        return #short circuit if too many dimensions, or only 1 dimension (in which case fancy labels don't make sense)
+        return fontsize_offset, fallback_rotation #short circuit if too many dimensions, or only 1 dimension (in which case fancy labels don't make sense)
 
     blocks = axis.get_blocks([axis.axis_names[0]])
     
@@ -109,7 +111,7 @@ def make_fancy_prebinned_labels(ax : matplotlib.axes.Axes,
     
     if not all_contiguous:
         print("WARNING: fancy prebinned labels only supported for contiguous blocks along axis")
-        return
+        return fontsize_offset, fallback_rotation
     
     major_ticks = []
     for block in blocks:
@@ -131,7 +133,7 @@ def make_fancy_prebinned_labels(ax : matplotlib.axes.Axes,
     ax.grid(axis=which, which='major', linestyle='--', alpha=0.9)
         
     if skip_labels:
-        return # no more work needed
+        return fontsize_offset, fallback_rotation # no more work needed
     
     #twin axis so that we can put labels BETWEEN the major ticks
     #by making invisible major ticks in the correct positions
@@ -175,11 +177,11 @@ def make_fancy_prebinned_labels(ax : matplotlib.axes.Axes,
     if which == 'x':
         set_ticks_fun = ax2.set_xticks
         extra_set_ticks_params = {}
-        extra_tick_params = {}
+        extra_tick_params = {'labelrotation' : fallback_rotation}
     else:
         set_ticks_fun = ax2.set_yticks
         extra_set_ticks_params = {'va' : 'center'}
-        extra_tick_params = {'labelrotation' : 90}
+        extra_tick_params = {'labelrotation' : 90 - fallback_rotation}
 
     set_ticks_fun(
         major_tick_centers, minor=False,
@@ -187,24 +189,35 @@ def make_fancy_prebinned_labels(ax : matplotlib.axes.Axes,
         **extra_set_ticks_params
     ) 
     set_ticks_fun([], minor=True)
+    whichlabel = {
+        'labelbottom' : False,
+        'labeltop' : False,
+        'labelleft' : False,
+        'labelright' : False
+    }
+    if which == 'x':
+        whichlabel['labelbottom'] = True
+    else:
+        whichlabel['labelleft'] = True
+
     ax2.tick_params(
         axis=which, direction='in', which='both',
-        labelbottom=True, labeltop=False,
-        labelsize=cfg['fontsize'],
+        **whichlabel,
+        labelsize=cfg['fontsize'] - fontsize_offset,
         length=0,
         **extra_tick_params
     )
 
     #feature is optional because it might be slow
     if cfg['check_label_overlap'] and which == 'x':
-        fontsize_offset = 0
         while (check_ticklabel_overlap(ax2) and cfg['fontsize'] - fontsize_offset > cfg['min_fontsize']):
             fontsize_offset += 1
             ax2.tick_params(axis=which, labelsize=cfg['fontsize'] - fontsize_offset)
         if fontsize_offset > 0 and cfg['fontsize'] - fontsize_offset <= cfg['min_fontsize']:
             print("WARNING: fancy prebinned labels had overlapping label even at minimum fontsize %d"%(cfg['min_fontsize']))
             print("\tRotating axis labels by 30 degrees")
-            ax2.tick_params(axis=which, labelrotation=30)
+            fallback_rotation = 30.
+            ax2.tick_params(axis=which, labelrotation=fallback_rotation)
         elif fontsize_offset > 0 and cfg['fontsize'] - fontsize_offset > cfg['min_fontsize']:
             print("WARNING: fancy prebinned labels had overlapping labels, reduced fontsize to %d"%(cfg['fontsize'] - fontsize_offset))
 
@@ -216,7 +229,7 @@ def make_fancy_prebinned_labels(ax : matplotlib.axes.Axes,
     ax.set_ylim(original_ylim)
     ax2.set_ylim(original_ylim)
 
-    return ax2
+    return fontsize_offset, fallback_rotation
 
 def draw_legend(ax: matplotlib.axes.Axes, nolegend: bool, scale: float=1.0, loc: Union[str, int, tuple] ='best'):
     if not nolegend:

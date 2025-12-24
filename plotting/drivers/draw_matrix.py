@@ -82,8 +82,10 @@ def draw_matrix(variable : VariableProtocol,
 
     add_text(ax, cut, extratext)
     
-    make_fancy_prebinned_labels(ax, axis, 'x')
-    make_fancy_prebinned_labels(ax, axis, 'y')
+    fontsize_offset, fallback_rotation = make_fancy_prebinned_labels(ax, axis, 'x')
+    make_fancy_prebinned_labels(ax, axis, 'y',
+                                fontsize_offset = fontsize_offset,
+                                fallback_rotation=fallback_rotation)
 
     ax.set_box_aspect(1)
 

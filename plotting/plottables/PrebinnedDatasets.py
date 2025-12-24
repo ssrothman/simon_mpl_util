@@ -71,14 +71,21 @@ class ValCovPairDataset(PrebinnedDatasetBase):
         return np.sum(self.data[0])
     
 class CovmatDataset(PrebinnedDatasetBase):
-    def __init__(self, key:str, color : str | None, label : str | None,
-                 covmat : np.ndarray, binning : ArbitraryBinning):
+    def __init__(self, 
+                 key:str, 
+                 color : str | None, 
+                 label : str | None,
+                 covmat : np.ndarray, 
+                 binning : ArbitraryBinning,
+                 isMC : bool = True):
         self._key = key
         self._color = color
         self._label = label
 
         self._data = covmat
         self._binning = binning
+
+        self._isMC = isMC
     
     @property
     def quantitytype(self):

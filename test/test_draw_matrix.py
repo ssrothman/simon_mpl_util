@@ -1,0 +1,34 @@
+from data_factory import synthetic_covdataset
+from simon_mpl_util.plotting import draw_matrix
+
+from simon_mpl_util.plotting.variable import BasicPrebinnedVariable, ConstantVariable
+from simon_mpl_util.plotting.cut import NoopOperation, ProjectionOperation, SliceOperation, ProjectAndSliceOperation
+from simon_mpl_util.plotting.binning import PrebinnedBinning
+
+dset, _ = synthetic_covdataset(100000, "MC")
+
+var1 = BasicPrebinnedVariable()
+binning = PrebinnedBinning()
+
+cut1 = NoopOperation()
+cut2 = ProjectionOperation(['pt'])
+cut3 = ProjectionOperation(['r'])
+cut4 = ProjectionOperation(['pt', 'phi'])
+cut5 = ProjectionOperation(['r', 'phi'])
+cut6 = SliceOperation({'pt' : (dset.binning.edges['pt'][2], dset.binning.edges['pt'][5])})
+cut7 = SliceOperation({'r' : (dset.binning.edges['r'][0], dset.binning.edges['r'][1]),
+                       'phi' : (dset.binning.edges['phi'][3], dset.binning.edges['phi'][7])})
+cut8 = ProjectAndSliceOperation(
+    axes = ['r'],
+    edges = {'pt' : (dset.binning.edges['pt'][1], dset.binning.edges['pt'][2])}
+)
+weight = ConstantVariable(1.0)
+
+for cut in [cut1, cut2, cut3, cut4, cut5, cut6, cut7, cut8]:
+    draw_matrix(
+        var1,
+        cut,
+        dset,
+        binning,
+        output_folder = 'unittest/draw_matrix/matrix'
+    )
