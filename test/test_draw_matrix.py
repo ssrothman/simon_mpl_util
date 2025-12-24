@@ -1,7 +1,7 @@
 from data_factory import synthetic_covdataset
 from simon_mpl_util.plotting import draw_matrix
 
-from simon_mpl_util.plotting.variable import BasicPrebinnedVariable, ConstantVariable
+from simon_mpl_util.plotting.variable import BasicPrebinnedVariable, ConstantVariable, WithJacobian, NormalizePerBlock
 from simon_mpl_util.plotting.cut import NoopOperation, ProjectionOperation, SliceOperation, ProjectAndSliceOperation
 from simon_mpl_util.plotting.binning import PrebinnedBinning
 
@@ -24,11 +24,26 @@ cut8 = ProjectAndSliceOperation(
 )
 weight = ConstantVariable(1.0)
 
-for cut in [cut1, cut2, cut3, cut4, cut5, cut6, cut7, cut8]:
+#for cut in [cut1, cut2, cut3, cut4, cut5, cut6, cut7, cut8]:
+for cut in []:
     draw_matrix(
         var1,
         cut,
         dset,
         binning,
         output_folder = 'unittest/draw_matrix/matrix'
+    )
+
+var2 = WithJacobian(var1, radial_coords=['r'], clip_negativeinf={'pt' : 0.0}, clip_positiveinf={'pt' : 10000.0})
+var3 = NormalizePerBlock(var1, axes=['pt'])
+var4 = NormalizePerBlock(var2, axes=['pt'])
+var5 = WithJacobian(var3, radial_coords=['r'], clip_negativeinf={'pt' : 0.0}, clip_positiveinf={'pt' : 10000.0})
+
+for var in [var2]:
+    draw_matrix(
+        var,
+        cut1,
+        dset,
+        binning,
+        output_folder = 'unittest/draw_matrix/matrix' 
     )
