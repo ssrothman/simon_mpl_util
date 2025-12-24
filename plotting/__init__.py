@@ -1,4 +1,4 @@
-import simon_mpl_util.plotting.config.config as config
+from simon_mpl_util.plotting.config import config
 import simon_mpl_util.plotting.binning as binning
 import simon_mpl_util.plotting.variable as variable
 import simon_mpl_util.plotting.cut as cut
