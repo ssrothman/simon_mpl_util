@@ -1,7 +1,7 @@
 from data_factory import synthetic_valcovdataset
 from simon_mpl_util.plotting.plottables import DatasetStack
 from simon_mpl_util.plotting import plot_histogram
-from simon_mpl_util.plotting.variable import PrebinnedVariable, ConstantVariable
+from simon_mpl_util.plotting.variable import BasicPrebinnedVariable, ConstantVariable
 from simon_mpl_util.plotting.cut import NoopOperation, ProjectionOperation, SliceOperation, ProjectAndSliceOperation
 from simon_mpl_util.plotting.binning import PrebinnedBinning
 
@@ -19,7 +19,7 @@ dset_data, _, _ = synthetic_valcovdataset(300000, "data")
 dset_data.set_lumi(0.1)
 dset_data.set_color('black')
 
-var1 = PrebinnedVariable()
+var1 = BasicPrebinnedVariable()
 binning = PrebinnedBinning()
 
 cut1 = NoopOperation()
