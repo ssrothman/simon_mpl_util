@@ -101,7 +101,8 @@ var3 = NormalizePerBlock(var1, axes=['pt'])
 var4 = NormalizePerBlock(var2, axes=['pt'])
 var5 = WithJacobian(var3, radial_coords=['r'], clip_negativeinf={'pt' : 0.0}, clip_positiveinf={'pt' : 10000.0})
 
-for var in [var1, var2, var3, var4, var5]:
+#for var in [var1, var2, var3, var4, var5]:
+for var in [var2]:
      plot_histogram(
         var, 
         cut1,

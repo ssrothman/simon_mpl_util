@@ -83,3 +83,12 @@ In any case, if a variable key does not match with any key in the `axis_labels` 
 ### Automatic logarithmic x-axes
 
 Passing `None` as the logx parameter to `plot_histogram` tells the code to automatically decide whether the x-axis should be logarithmic. This is controlled by the `auto_logx_patterns : List[str]` option. The logic here is simple: if the `key` for the variable being plotted matches (with the same wildcard rules as the `axis_labels` dict) any entry in the `auto_logx_patterns` list, then the x-axis will be logarithmic. 
+
+### Tweaking perverse y-limits
+
+When the y-axis is logarithmic and there are large error bars, matplotlib can sometime try too hard to keep the full error bars within the plotting limits. This can result in y axis ranges which are orders of magnitude wider than the actual data range. I attempt to resolve this by detecting perverse y-limits and overriding them. The logic is very simple:
+
+ 1. Compute the minimum nonzero plotted y value
+ 2. Determine the automatic matplotlib y-axis range
+ 3. If the ratio of the minimum plotted value divided by the lower axis bound is greater than `ylim_tweak.perversity_threshold` then we need to override the lower y-axis bound. Else, do nothing
+ 4. If we need to overwrite the lower y-axis bound, use the lowest plotted value, divided by `ylim_tweak.padding_factor`

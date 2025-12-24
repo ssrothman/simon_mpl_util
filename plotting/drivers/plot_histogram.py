@@ -251,6 +251,17 @@ def plot_histogram(variable_: Union[VariableProtocol, List[VariableProtocol]],
     if logy:
         ax_main.set_yscale('log')
 
+    if logy: # sometimes logarithmic y axes end up with perverse ranges
+        ylim = ax_main.get_ylim()
+        min_trueY = np.max(Hs[0][0])
+        for H in Hs:
+            Hmin = np.min(H[0][H[0] > 0])
+            if min_trueY is None or Hmin < min_trueY:
+                min_trueY = Hmin
+
+        if min_trueY / ylim[0] > config['ylim_tweak']['perversity_threshold']:
+            ax_main.set_ylim(min_trueY/config['ylim_tweak']['padding_factor'])
+
     if variable[0].centerline is not None:
         cls = variable[0].centerline
         if isinstance(cls, Sequence):

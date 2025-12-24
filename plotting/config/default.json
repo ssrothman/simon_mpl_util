@@ -10,6 +10,10 @@
             "min_threshold" : 0.2
         }
     },
+    "ylim_tweak" : {
+        "perversity_threshold" : 1000,
+        "padding_factor" : 10
+    },
     "fancy_prebinned_labels" : {
         "enabled" : true,
         "max_ndim" : 3,
