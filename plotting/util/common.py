@@ -201,11 +201,6 @@ def make_fancy_prebinned_labels(ax : matplotlib.axes.Axes,
         while (check_ticklabel_overlap(ax2) and cfg['fontsize'] - fontsize_offset > cfg['min_fontsize']):
             fontsize_offset += 1
             ax2.tick_params(axis=which, labelsize=cfg['fontsize'] - fontsize_offset)
-
-        if fontsize_offset > 0 and cfg['fontsize'] - fontsize_offset > cfg['min_fontsize']:
-            fontsize_offset += 1 #offset by one more to ensure no overlap
-            ax2.tick_params(axis=which, labelsize=cfg['fontsize'] - fontsize_offset)
-
         if fontsize_offset > 0 and cfg['fontsize'] - fontsize_offset <= cfg['min_fontsize']:
             print("WARNING: fancy prebinned labels had overlapping label even at minimum fontsize %d"%(cfg['min_fontsize']))
             print("\tRotating axis labels by 30 degrees")
