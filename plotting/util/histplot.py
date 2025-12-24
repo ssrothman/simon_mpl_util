@@ -64,6 +64,17 @@ def _simon_histplot(vals, errs, edges, centers, widths,
     ploterrs = errs/widths
 
     if fillbetween is not None:
+        # clip flow bins
+        # NB fillbetween does NOT need to be clipped
+        # as it is built from the (already clipped) return of THIS FUNCTION
+        if edges[0] == -np.inf:
+            edges = edges[1:]
+            plotvals = plotvals[1:]
+
+        if edges[-1] == +np.inf:
+            edges = edges[:-1]
+            plotvals = plotvals[:-1]
+
         artist = _call_stairs(ax, edges, plotvals+fillbetween, fillbetween, **kwargs)
         return artist, plotvals+fillbetween
     else:

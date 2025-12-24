@@ -33,58 +33,24 @@ cut7 = ProjectAndSliceOperation(
     axes = ['r'],
     edges = {'pt' : (dset_MC1.binning.edges['pt'][1], dset_MC1.binning.edges['pt'][2])}
 )
+cut8 = ProjectionOperation(['r', 'phi'])
+
 weight = ConstantVariable(1.0)
 
-'''
-plot_histogram(
-    var1,
-    cut1,
-    weight,
-    dset_MC1,
-    binning,
-    output_folder='unittest/prebinned_plot_histogram/hist',
-    logy = True,
-)
-plot_histogram(
-    var1,
-    cut1,
-    weight,
-    [dset_MC1, dset_MC2],
-    binning,
-    output_folder='unittest/prebinned_plot_histogram/hist',
-    logy = True,
-)
-plot_histogram(
-    var1,
-    cut1,
-    weight,
-    [dset_MC1, dset_MC2, dset_MCstack, dset_data],
-    binning,
-    output_folder='unittest/prebinned_plot_histogram/hist',
-    logy = True,
-)
-plot_histogram(
-    var1,
-    cut1,
-    weight,
-    [dset_MCstack, dset_data],
-    binning,
-    output_folder='unittest/prebinned_plot_histogram/hist',
-    logy = True,
-)
-plot_histogram(
-    var1,
-    cut1,
-    weight,
-    [dset_MCstack, dset_data],
-    binning,
-    output_folder='unittest/prebinned_plot_histogram/hist',
-    logy = True,
-    pulls=True
-)
+#for dsetset in [dset_MC1,  [dset_MC1, dset_MC2],  [dset_MC1, dset_MC2, dset_MCstack, dset_data],  [dset_MCstack, dset_data],  [dset_MCstack, dset_data]]: 
+for dsetset in []:
+    plot_histogram(
+        var1,
+        cut1,
+        weight,
+        dsetset,
+        binning,
+        output_folder='unittest/prebinned_plot_histogram/hist',
+        logy = True,
+    )
 
-
-for cut in [cut2, cut3, cut4, cut5, cut6, cut7]:
+#for cut in [cut2, cut3, cut4, cut5, cut6, cut7, cut8]:
+for cut in [cut8]:
      plot_histogram(
          var1,
          cut,
@@ -94,7 +60,7 @@ for cut in [cut2, cut3, cut4, cut5, cut6, cut7]:
          output_folder='unittest/prebinned_plot_histogram/hist',
          logy = True,
      )
-'''
+
 
 var2 = WithJacobian(var1, radial_coords=['r'], clip_negativeinf={'pt' : 0.0}, clip_positiveinf={'pt' : 10000.0})
 var3 = NormalizePerBlock(var1, axes=['pt'])
@@ -102,7 +68,7 @@ var4 = NormalizePerBlock(var2, axes=['pt'])
 var5 = WithJacobian(var3, radial_coords=['r'], clip_negativeinf={'pt' : 0.0}, clip_positiveinf={'pt' : 10000.0})
 
 #for var in [var1, var2, var3, var4, var5]:
-for var in [var2]:
+for var in []:
      plot_histogram(
         var, 
         cut1,
