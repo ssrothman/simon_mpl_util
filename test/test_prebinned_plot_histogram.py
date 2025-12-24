@@ -1,7 +1,7 @@
 from data_factory import synthetic_valcovdataset
 from simon_mpl_util.plotting.plottables import DatasetStack
 from simon_mpl_util.plotting import plot_histogram
-from simon_mpl_util.plotting.variable import BasicPrebinnedVariable, ConstantVariable
+from simon_mpl_util.plotting.variable import BasicPrebinnedVariable, ConstantVariable, WithJacobian, NormalizePerBlock
 from simon_mpl_util.plotting.cut import NoopOperation, ProjectionOperation, SliceOperation, ProjectAndSliceOperation
 from simon_mpl_util.plotting.binning import PrebinnedBinning
 
@@ -35,7 +35,7 @@ cut7 = ProjectAndSliceOperation(
 )
 weight = ConstantVariable(1.0)
 
-
+'''
 plot_histogram(
     var1,
     cut1,
@@ -93,4 +93,21 @@ for cut in [cut2, cut3, cut4, cut5, cut6, cut7]:
          binning,
          output_folder='unittest/prebinned_plot_histogram/hist',
          logy = True,
+     )
+'''
+
+var2 = WithJacobian(var1, radial_coords=['r'], clip_negativeinf={'pt' : 0.0}, clip_positiveinf={'pt' : 10000.0})
+var3 = NormalizePerBlock(var1, axes=['pt'])
+var4 = NormalizePerBlock(var2, axes=['pt'])
+var5 = WithJacobian(var3, radial_coords=['r'], clip_negativeinf={'pt' : 0.0}, clip_positiveinf={'pt' : 10000.0})
+
+for var in [var1, var2, var3, var4, var5]:
+     plot_histogram(
+        var, 
+        cut1,
+        weight,
+        [dset_MC1, dset_MC2],
+        binning,
+        output_folder='unittest/prebinned_plot_histogram/hist',
+        logy = True,
      )

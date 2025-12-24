@@ -75,11 +75,14 @@ class WithJacobian(VariableBase):
 
         for key in self._clip_negativeinf:
             if key in lower_edges:
-                lower_edges[key][lower_edges[key] == -np.inf] = self._clip_negativeinf[key]
+                edges = lower_edges[key]
+                lower_edges[key] = np.where(edges == -np.inf, self._clip_negativeinf[key], edges)
+                
 
         for key in self._clip_positiveinf:
             if key in upper_edges:
-                upper_edges[key][upper_edges[key] == np.inf] = self._clip_positiveinf[key]
+                edges = upper_edges[key]
+                upper_edges[key] = np.where(edges == np.inf, self._clip_positiveinf[key], edges)
 
         widths = {}
         for key in binning.axis_names:
@@ -88,13 +91,24 @@ class WithJacobian(VariableBase):
             else:
                 widths[key] = upper_edges[key] - lower_edges[key]
 
+        if type(hist) is tuple:
+            hist, cov = hist
+        else:
+            cov = None
+
         jacobian = np.ones_like(hist)
         for key in binning.axis_names:
-            jacobian *= widths[key]
+            jacobian *= widths[key].ravel()
 
         jacobian[jacobian == 0] = 1.0 #avoid division by zero
         density_hist = hist / jacobian
-        return density_hist
+
+        if cov is not None:
+            density_jacobian = np.outer(jacobian, jacobian)
+            density_cov = cov / density_jacobian
+            return density_hist, density_cov
+        else:
+            return density_hist
     
     def __eq__(self, other) -> bool:
         if not isinstance(other, WithJacobian):
@@ -136,11 +150,20 @@ class NormalizePerBlock(VariableBase):
             raise ValueError("PrebinnedDensityVariable requires a PrebinnedOperationProtocol cut")
         
         hist = self._var.evaluate(dataset, cut)
+        if type(hist) is tuple:
+            hist, cov = hist
+        else:
+            cov = None
+
         binning = cut.resulting_binning(dataset)
 
-        fluxes, _, _ = binning.get_fluxes_shapes(hist, self._axes)
+        fluxes, shapes, _ = binning.get_fluxes_shapes(hist, self._axes)
 
-        return fluxes
+        if cov is not None:
+            _, covshapes, _ = binning.get_fluxes_shapes_cov2d(fluxes, shapes, cov,  self._axes)
+            return shapes, covshapes
+        else:
+            return shapes
     
     def __eq__(self, other) -> bool:
         if not isinstance(other, NormalizePerBlock):

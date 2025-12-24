@@ -1203,6 +1203,69 @@ class ArbitraryBinning:
         result, _ = self.rebin(result.T, rebinning_spec)
         return result, newbinning
 
+    def get_fluxes_shapes_cov2d(self,
+                                fluxes : np.ndarray, 
+                                shapes : np.ndarray,
+                                cov : np.ndarray, 
+                                axes : List[str]) -> Tuple[np.ndarray, np.ndarray, 'ArbitraryBinning']:
+        '''
+        Get covariance of fluxes and shapes as returned by get_fluxes_shapes()
+        
+        :param self: This object
+        :param data: 2d Covariance matrix
+        :type data: np.ndarray
+        :param axes: List of axes along which to take fluxes and shapes
+        :type axes: List[str]
+        :return: (covflux, covshape, covfluxshape)
+        :rtype: Tuple[ndarray[_AnyShape, dtype[Any]], ndarray[_AnyShape, dtype[Any]], ArbitraryBinning]
+        '''
+        blocks = self.get_blocks(axes)
+        Nflux = len(fluxes)
+        Nshape = len(shapes)
+
+        covflux = np.zeros(shape=(Nflux, Nflux), dtype=fluxes.dtype)
+        covfluxshape = np.zeros((Nflux, Nshape), dtype=cov.dtype)
+        covshapes = np.zeros_like(cov) 
+
+        #mapping from shape to flux
+        fluxindex = np.zeros(Nshape, dtype=np.int32)
+        for i, block in enumerate(blocks):
+            fluxindex[block['slice']] = i
+
+        for a, blockA in enumerate(blocks):
+            sliceA = blockA['slice']
+            for b, blockB in enumerate(blocks):
+                sliceB = blockB['slice']
+
+                covflux[a, b] = np.sum(cov[sliceA, :][:, sliceB])
+
+        #covfluxshape
+        for a, blockA in enumerate(blocks):
+            sliceA = blockA['slice']
+
+            for b, blockB in enumerate(blocks):
+                sliceB = blockB['slice']
+                
+                covfluxshape[a, sliceB] += np.sum(cov[sliceA, sliceB], axis=0) / fluxes[b]
+                covfluxshape[a, sliceB] -= (shapes[sliceB]/fluxes[b])  * np.sum(cov[sliceA, :][:, sliceB], axis=None)
+
+        #covshape
+        for a, blockA in enumerate(blocks):
+            sliceA = blockA['slice']
+
+            for b, blockB in enumerate(blocks):
+                sliceB = blockB['slice']
+
+                covshapes[sliceA, :][:, sliceB] += cov[sliceA, :][:, sliceB] / (fluxes[a] * fluxes[b])
+
+                covshapes[sliceA, :][:, sliceB] += (np.outer(shapes[sliceA], shapes[sliceB]) / (fluxes[a] * fluxes[b])) * np.sum(cov[sliceA, :][:, sliceB], axis=None)
+
+                covshapes[sliceA, :][:, sliceB] -= np.outer(shapes[sliceA]/(fluxes[a] * fluxes[b]), np.sum(cov[sliceA, :][:, sliceB], axis=0))
+                covshapes[sliceA, :][:, sliceB] -= np.outer(np.sum(cov[sliceA, :][:, sliceB], axis=1), shapes[sliceB]/(fluxes[a] * fluxes[b]))
+
+        return covflux, covshapes, covfluxshape
+
+
     def get_fluxes_shapes(self, data : np.ndarray, axes : List[str]) -> Tuple[np.ndarray, np.ndarray, 'ArbitraryBinning']:
         '''
         Get fluxes and shapes along specified axes. 
