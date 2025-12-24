@@ -167,6 +167,37 @@ class _BinningBlock:
         for i in range(self.Nax - 1, 0, -1):
             self.strides[i-1] = self.strides[i] * self.extents[i]
 
+    def block_edges(self, lower: bool =True) -> dict:
+        '''
+        Get the bin edges for all axes in this _BinningBlock
+                
+        :param self: This object
+        :param lower: If True, get lower edges; if False, get upper edges
+        :type lower: bool
+        :return: Dictionary of bin edges for all axes, in the format
+            { axis_name : np.ndarray in the same shape as the data }
+        :rtype: dict[Any, Any]
+        '''
+        fullshape = [self.ax_details[name]['extent'] for name in self.axis_names]
+
+        result = {}
+        for i in range(self.Nax):
+            name = self.axis_names[i]
+            edges = np.asarray(self.ax_details[name]['edges'])
+            if lower:
+                edges = edges[:-1]
+            else:
+                edges = edges[1:]
+
+            #need to expand to match data shape
+            theshape = [1] * self.Nax
+            theshape[i] = self.ax_details[name]['extent']
+            edges = edges.reshape(theshape)
+            edges = np.broadcast_to(edges, fullshape)
+            result[name] = edges
+        
+        return result
+
     def rebin(self, rebinning_spec : Union[dict, str]) -> List['_BinningBlock']:
         '''
         Rebin this _BinningBlock according to the provided rebinning_spec.
@@ -780,6 +811,51 @@ class ArbitraryBinning:
             block.from_dict(blockdata)
             self._blocks.append(block)
         
+    def _get_edges(self, lower: bool =True) -> dict:
+        '''
+        Get the bin edges for all axes in this ArbitraryBinning
+        
+        :param self: This object
+        :param lower: If True, get lower edges; if False, get upper edges
+        :type lower: bool
+        :return: Dictionary of bin edges for all axes, in the format
+            { axis_name : np.ndarray in the same shape as the data }
+        :rtype: dict[Any, Any]
+        '''
+        result = {}
+
+        for block in self._blocks:
+            block_edges = block.block_edges(lower=lower)
+            for name in block_edges:
+                if name not in result:
+                    result[name] = block_edges[name]
+                else:
+                    result[name] = np.concatenate((result[name], block_edges[name]), axis=0)
+
+        return result
+
+    def lower_edges(self) -> dict:
+        '''
+        Get the lower bin edges for all axes in this ArbitraryBinning
+        
+        :param self: This object
+        :return: Dictionary of lower bin edges for all axes, in the format
+            { axis_name : np.ndarray in the same shape as the data }
+        :rtype: dict[Any, Any]
+        '''
+        return self._get_edges(lower=True)
+    
+    def upper_edges(self) -> dict:
+        '''
+        Get the upper bin edges for all axes in this ArbitraryBinning
+        
+        :param self: This object
+        :return: Dictionary of upper bin edges for all axes, in the format
+            { axis_name : np.ndarray in the same shape as the data }
+        :rtype: dict[Any, Any]
+        '''
+        return self._get_edges(lower=False)
+
     def value_at(self, data : np.ndarray, theedges : dict):
         '''
         Lookup value at the specified bin, identified by the lower bin edges.

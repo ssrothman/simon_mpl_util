@@ -62,20 +62,13 @@ class PrebinnedDensityVariable(VariableBase):
         hist = cut.evaluate(dataset)
         binning = cut.resulting_binning(dataset)
 
-        #TO DO
-        # should return dictionaries of 
-        # {axis_name : lower_edges_array}
-        # {axis_name : upper_edges_array}
-        # where the arrays have the same shape as the data
-        # it should be possible to do this reasonably efficiently
-        # looping over blocks, and having blocks use np.repeat()?
         lower_edges = binning.lower_edges()
         upper_edges = binning.upper_edges()
 
         widths = {}
         for key in binning.axis_names:
             if key in self._radial_coords:
-                widths[key] = np.square(upper_edges[key] ) - np.square(lower_edges[key])
+                widths[key] = np.square(upper_edges[key]) - np.square(lower_edges[key])
             else:
                 widths[key] = upper_edges[key] - lower_edges[key]
 
