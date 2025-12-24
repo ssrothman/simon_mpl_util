@@ -48,3 +48,9 @@ Need to think a bit about what would be desireable here
 ## Prevent multipliers above the axis, which clashes with the CMS label text
 
 This is easy I think, just need to google it when I'm back in internet :)
+
+## Track values alongside covariance in covmat dataset? Or merge covmat dataset with valcov dataset, and introduce new covfromvalcov variable object? Or...
+
+Needed for covariance on shapes, and also for beauty
+
+Can add type checks to .project() and .slice() methods to make sure to handle covariance matrix vs histograms correctly
