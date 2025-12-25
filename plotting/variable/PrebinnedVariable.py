@@ -1,6 +1,7 @@
 from turtle import up
 from plotting.typing.Protocols import VariableProtocol
 from simon_mpl_util.plotting.typing.Protocols import PrebinnedOperationProtocol
+from util.sanitization import maybe_valcov_to_definitely_valcov
 from .VariableBase import VariableBase
 from typing import Sequence, assert_never, override, List
 import numpy as np
@@ -68,30 +69,7 @@ class WithJacobian(VariableBase):
             raise ValueError("PrebinnedDensityVariable requires a PrebinnedOperationProtocol cut")
         
         evaluated = self._var.evaluate(dataset, cut)
-        if type(evaluated) is tuple:
-            hist, cov = evaluated
-            if len(hist.shape) != 1:
-                raise ValueError("evaluating _var (%s) resulted in a val,cov pair where val had shape %s (expected 1D)"%(self._var.key, hist.shape))
-            if len(cov.shape) != 2:
-                raise ValueError("evaluating _var (%s) resulted in a val,cov pair where cov had shape %s (expected 2D)"%(self._var.key, cov.shape))
-            if cov.shape != (len(hist), len(hist)):
-                raise ValueError("cov shape not the square of val shape!")
-            
-            thelen = len(hist)
-            thedtype = hist.dtype
-        else:
-            if len(evaluated.shape) == 1:
-                hist = evaluated
-                cov = None
-                thelen = len(hist)
-                thedtype = hist.dtype
-            elif len(evaluated.shape) == 2:
-                hist = None
-                cov = evaluated
-                thelen = cov.shape[0]
-                thedtype = cov.dtype
-            else:
-                raise RuntimeError("evaluating _var (%s) resulted in an unexpected shape! Should be either 1D or 2D, but got %s"%(self._var.key, evaluated.shape))
+        hist, cov, thelen, thedtype = maybe_valcov_to_definitely_valcov(evaluated)
 
         #after type checks we can be confident that
         #hist = np.ndarray with shape (thelen,), or else None
@@ -130,8 +108,8 @@ class WithJacobian(VariableBase):
             density_hist = hist / jacobian
 
         if cov is not None:
-            density_jacobian = np.outer(jacobian, jacobian)
-            density_cov = cov / density_jacobian
+            cov_jacobian = np.outer(jacobian, jacobian)
+            density_cov = cov / cov_jacobian
 
         if hist is None and cov is None:
             raise ValueError("This shouldn't be possible. Somehow both val and cov are None?")
@@ -159,7 +137,6 @@ class WithJacobian(VariableBase):
     def set_collection_name(self, collection_name):
         raise ValueError("Prebinned Variables do not support set_collection_name")
 
-
 class NormalizePerBlock(VariableBase):
     def __init__(self, variable : VariableProtocol, axes : List[str]):
         self._var = variable
@@ -181,12 +158,11 @@ class NormalizePerBlock(VariableBase):
         if not isinstance(cut, PrebinnedOperationProtocol):
             raise ValueError("PrebinnedDensityVariable requires a PrebinnedOperationProtocol cut")
         
-        hist = self._var.evaluate(dataset, cut)
-        if type(hist) is tuple:
-            hist, cov = hist
-        else:
-            cov = None
-
+        evaluated = self._var.evaluate(dataset, cut)
+        hist, cov, _, _ = maybe_valcov_to_definitely_valcov(evaluated)
+        if hist is None:
+            raise ValueError("Can't NormalizerPerBlock without histogram values!")
+        
         binning = cut.resulting_binning(dataset)
 
         fluxes, shapes, _ = binning.get_fluxes_shapes(hist, self._axes)
@@ -212,3 +188,54 @@ class NormalizePerBlock(VariableBase):
     def set_collection_name(self, collection_name):
         raise ValueError("Prebinned Variables do not support set_collection_name")
 
+class CorrelationFromCovariance(VariableBase):
+    def __init__(self, variable : VariableProtocol):
+        self._var = variable
+
+    @property
+    def _natural_centerline(self):
+        return 0
+
+    @property
+    def columns(self):
+        return []
+    
+    @property
+    def prebinned(self) -> bool:
+        return True
+    
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, CorrelationFromCovariance):
+            return False
+        return (self._var == other._var)
+    
+    def evaluate(self, dataset, cut):
+        if not isinstance(cut, PrebinnedOperationProtocol):
+            raise ValueError("PrebinnedDensityVariable requires a PrebinnedOperationProtocol cut")
+
+        evaluated = self._var.evaluate(dataset, cut)
+        hist, cov, _, _ = maybe_valcov_to_definitely_valcov(evaluated)
+
+        if cov is None:
+            raise RuntimeError("CorrelationFromCovariance needs covariance!!")
+        
+        errs = np.sqrt(np.diag(cov))
+        outer = np.outer(errs, errs)
+        outer[outer==0] = 1 #avoid divide by zero
+
+        correl = cov/outer
+
+        if hist is not None:
+            vals = hist/errs 
+            return vals, correl
+        else:
+            return correl
+
+    @property 
+    @override
+    def key(self):
+        return "CorrelationFromCovariance(%s)" % self._var.key
+
+    @override    
+    def set_collection_name(self, collection_name):
+        raise ValueError("Prebinned Variables do not support set_collection_name")

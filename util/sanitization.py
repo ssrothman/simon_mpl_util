@@ -1,4 +1,35 @@
-from typing import List, Union
+from typing import List, Union, Tuple
+import numpy as np
+
+def maybe_valcov_to_definitely_valcov(evaluated : np.ndarray | Tuple[np.ndarray, np.ndarray]):
+        if isinstance(evaluated, tuple):
+            hist, cov = evaluated
+
+            if len(hist.shape) != 1:
+                raise ValueError("Unpacking valcov pair yielded val with shape %s! (expected 1D)"%hist.shape)
+            if len(cov.shape) != 2:
+                raise ValueError("Unpacking valcov pair yielded cov with shape %s! (expected 2D)"%cov.shape)
+
+            if cov.shape != (len(hist), len(hist)):
+                raise ValueError("cov shape not the square of val shape!")
+            
+            thelen = len(hist)
+            thedtype = hist.dtype
+        else:
+            if len(evaluated.shape) == 1:
+                hist = evaluated
+                cov = None
+                thelen = len(hist)
+                thedtype = hist.dtype
+            elif len(evaluated.shape) == 2:
+                hist = None
+                cov = evaluated
+                thelen = cov.shape[0]
+                thedtype = cov.dtype
+            else:
+                raise ValueError("Unexpected data shape %s! (Expected 1D hist or 2D covariance)"%(evaluated.shape))
+
+        return hist, cov, thelen, thedtype
 
 def ensure_same_length(*args):
     result = []
