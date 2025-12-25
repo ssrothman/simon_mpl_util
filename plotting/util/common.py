@@ -21,6 +21,9 @@ from typing import Literal, Union, List, reveal_type
 
 hep.style.use(hep.style.CMS)
 matplotlib.rcParams['savefig.dpi'] = 300
+matplotlib.rcParams['axes.formatter.useoffset'] = False
+matplotlib.rcParams['axes.formatter.use_mathtext'] = True
+
 
 def setup_canvas() -> matplotlib.figure.Figure:
     fig = plt.figure(figsize=config['figsize'])
