@@ -116,8 +116,8 @@ def make_fancy_prebinned_labels(ax : matplotlib.axes.Axes,
     major_ticks = []
     for block in blocks:
         start = block['slice'].start 
-        major_ticks.append(start - 0.5)
-    major_ticks.append(axis.total_size - 0.5)
+        major_ticks.append(start)
+    major_ticks.append(axis.total_size)
     major_ticks = np.asarray(major_ticks)
 
     if which == 'x':
