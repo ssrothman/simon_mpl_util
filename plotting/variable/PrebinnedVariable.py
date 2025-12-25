@@ -11,34 +11,27 @@ class BasicPrebinnedVariable(VariableBase):
         pass #stateless
     
     @property
-    @override
     def _natural_centerline(self):
         return None
     
     @property 
-    @override
     def columns(self):
         return []
     
     @property
-    @override
     def prebinned(self) -> bool:
         return True
     
-    @override
     def evaluate(self, dataset, cut):
         return cut.evaluate(dataset)
 
     @property 
-    @override
     def key(self):
         return "PREBINNED"
 
-    @override    
     def set_collection_name(self, collection_name):
         raise ValueError("Prebinned Variables do not support set_collection_name")
 
-    @override
     def __eq__(self, other) -> bool:
         return isinstance(other, BasicPrebinnedVariable)
     
@@ -129,11 +122,9 @@ class WithJacobian(VariableBase):
                 self._clip_positiveinf == other._clip_positiveinf)
 
     @property 
-    @override
     def key(self):
         return "WithJacobian(%s)" % self._var.key
 
-    @override    
     def set_collection_name(self, collection_name):
         raise ValueError("Prebinned Variables do not support set_collection_name")
 
@@ -180,11 +171,9 @@ class NormalizePerBlock(VariableBase):
                 self._axes == other._axes)
     
     @property 
-    @override
     def key(self):
         return "NormalizePerBlock(%s)" % self._var.key
 
-    @override    
     def set_collection_name(self, collection_name):
         raise ValueError("Prebinned Variables do not support set_collection_name")
 
@@ -232,10 +221,48 @@ class CorrelationFromCovariance(VariableBase):
             return correl
 
     @property 
-    @override
     def key(self):
         return "CorrelationFromCovariance(%s)" % self._var.key
 
-    @override    
     def set_collection_name(self, collection_name):
         raise ValueError("Prebinned Variables do not support set_collection_name")
+    
+class _ExtractCovarianceMatrix(VariableBase):
+    def __init__(self, variable : VariableProtocol):
+        self._var = variable
+
+    @property
+    def _natural_centerline(self):
+        return 0
+
+    @property
+    def columns(self):
+        return []
+    
+    @property
+    def prebinned(self) -> bool:
+        return True
+    
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, _ExtractCovarianceMatrix):
+            return False
+        return (self._var == other._var)
+    
+    @property 
+    def key(self):
+        return "Cov(%s)" % self._var.key
+
+    def set_collection_name(self, collection_name):
+        raise ValueError("Prebinned Variables do not support set_collection_name")
+    
+    def evaluate(self, dataset, cut):
+        if not isinstance(cut, PrebinnedOperationProtocol):
+            raise ValueError("ExtractCovarianceMatrix requires a PrebinnedOperationProtocol cut")
+
+        evaluated = self._var.evaluate(dataset, cut)
+        hist, cov, _, _ = maybe_valcov_to_definitely_valcov(evaluated)
+
+        if cov is None:
+            raise RuntimeError("ExtractCovarianceMatrix needs covariance!!")
+        
+        return cov

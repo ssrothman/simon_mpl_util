@@ -4,6 +4,7 @@ from typing import Union, List, Literal, get_args
 import matplotlib
 from matplotlib.colors import Normalize, SymLogNorm, LogNorm
 
+from plotting.variable.PrebinnedVariable import _ExtractCovarianceMatrix
 from simon_mpl_util.plotting.typing.Protocols import PrebinnedOperationProtocol, PrebinnedDatasetProtocol, PrebinnedBinningProtocol, VariableProtocol
 from simon_mpl_util.plotting.util.common import add_text, label_from_binning, make_fancy_prebinned_labels, setup_canvas, make_oneax, savefig, add_cms_legend
 
@@ -22,6 +23,8 @@ def draw_matrix(variable : VariableProtocol,
                 output_folder: Union[str, None] = None,
                 output_prefix: Union[str, None] = None):
     
+    variable = _ExtractCovarianceMatrix(variable)
+
     #get resulting binning
     axis = binning.build_prebinned_axis(dataset, cut)
 

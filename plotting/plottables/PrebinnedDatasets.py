@@ -18,16 +18,21 @@ class PrebinnedDatasetBase(SingleDatasetBase):
         return self._binning
 
 class ValCovPairDataset(PrebinnedDatasetBase):
-    def __init__(self, key : str, color : str | None, label : str | None,
+    def __init__(self, 
+                 key : str, 
+                 color : str | None,
+                 label : str | None,
                  data : tuple[np.ndarray, np.ndarray], 
-                 binning : ArbitraryBinning):
+                 binning : ArbitraryBinning,
+                 isMC : bool = True):
         self._key = key
         self._color = color
         self._label = label
 
         self._data = data
         self._binning = binning
-
+        
+        self._isMC = isMC
 
     @property
     def quantitytype(self):
@@ -70,6 +75,7 @@ class ValCovPairDataset(PrebinnedDatasetBase):
     def num_rows(self) -> int:
         return np.sum(self.data[0])
     
+
 class CovmatDataset(PrebinnedDatasetBase):
     def __init__(self, 
                  key:str, 

@@ -1,4 +1,4 @@
-from data_factory import synthetic_covdataset
+from data_factory import synthetic_covdataset, synthetic_valcovdataset
 from plotting.variable.PrebinnedVariable import CorrelationFromCovariance
 from simon_mpl_util.plotting import draw_matrix
 
@@ -6,7 +6,7 @@ from simon_mpl_util.plotting.variable import BasicPrebinnedVariable, ConstantVar
 from simon_mpl_util.plotting.cut import NoopOperation, ProjectionOperation, SliceOperation, ProjectAndSliceOperation
 from simon_mpl_util.plotting.binning import PrebinnedBinning
 
-dset, _ = synthetic_covdataset(100000, "MC")
+dset, _, _= synthetic_valcovdataset(100000, "MC")
 
 var1 = BasicPrebinnedVariable()
 binning = PrebinnedBinning()
@@ -25,8 +25,8 @@ cut8 = ProjectAndSliceOperation(
 )
 weight = ConstantVariable(1.0)
 
-#for cut in [cut1, cut2, cut3, cut4, cut5, cut6, cut7, cut8]:
-for cut in []:
+for cut in [cut1, cut2, cut3, cut4, cut5, cut6, cut7, cut8]:
+#for cut in []:
     draw_matrix(
         var1,
         cut,
@@ -41,7 +41,8 @@ var4 = NormalizePerBlock(var2, axes=['pt'])
 var5 = WithJacobian(var3, radial_coords=['r'], clip_negativeinf={'pt' : 0.0}, clip_positiveinf={'pt' : 10000.0})
 var6 = CorrelationFromCovariance(var1)
 
-for var in [var2, var6]:
+for var in [var2, var3, var4, var5, var6]:
+#for var in [var2, var6]:
     draw_matrix(
         var,
         cut1,
