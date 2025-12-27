@@ -1,6 +1,6 @@
-from simon_mpl_util.plotting.config import config, check_auto_logx
+from simon_mpl_util.plotting.config import config, check_auto_logx, lookup_axis_label
 
-from simon_mpl_util.plotting.typing.Protocols import VariableProtocol, PrebinnedOperationProtocol, PrebinnedDatasetProtocol, PrebinnedBinningProtocol
+from simon_mpl_util.plotting.typing.Protocols import PrebinnedVariableProtocol, VariableProtocol, PrebinnedOperationProtocol, PrebinnedDatasetProtocol, PrebinnedBinningProtocol
 from simon_mpl_util.plotting.util.common import make_radial_ax, setup_canvas, add_cms_legend, savefig, add_text, draw_legend, make_oneax, make_axes_withpad, get_artist_color, make_fancy_prebinned_labels, label_from_binning
 
 from simon_mpl_util.util.AribtraryBinning import ArbitraryBinning
@@ -24,12 +24,11 @@ class _RANGES(IntEnum):
     QUARTER = 2
 
 def draw_radial_histogram(
-                   variable : VariableProtocol,
+                   variable : PrebinnedVariableProtocol,
                    cut: PrebinnedOperationProtocol, 
                    dataset: PrebinnedDatasetProtocol,
                    binning : PrebinnedBinningProtocol,
                    extratext : Union[str, None] = None,
-                   density: bool = False,
                    logc : bool = True,
                    output_folder: Union[str, None] = None,
                    output_prefix: Union[str, None] = None):
@@ -90,7 +89,17 @@ def draw_radial_histogram(
     )
 
     cbar = fig.colorbar(artist, ax=ax, pad=0.1)
-    cbar.set_label("LABEL")
+
+    if variable.normalized_by_err:
+        cbarlabel = '$\\frac{N}{\\sigma_N}$'
+    elif variable.hasjacobian:
+        radial_label = strip_dollar_signs(strip_units(lookup_axis_label(radial_name)))
+        angular_label = strip_dollar_signs(strip_units(lookup_axis_label(angular_name)))
+        cbarlabel = '$\\frac{dN}{%sd%sd%s}$'% (radial_label, radial_label, angular_label)
+    else:
+        cbarlabel = 'Bin counts'
+
+    cbar.set_label(cbarlabel)
 
     add_text(ax, cut, extratext)
 

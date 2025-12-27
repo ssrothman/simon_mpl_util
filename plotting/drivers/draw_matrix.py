@@ -12,8 +12,6 @@ from simon_mpl_util.plotting.util.common import add_text, label_from_binning, ma
 import numpy as np
 import matplotlib.pyplot as plt
 
-_ALLOWED_NORMS = Literal["none", "ax1", "ax2", "correl"]
-
 def draw_matrix(variable : PrebinnedVariableProtocol,
                 cut: PrebinnedOperationProtocol, 
                 dataset: PrebinnedDatasetProtocol,
