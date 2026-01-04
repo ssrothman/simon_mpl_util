@@ -3,8 +3,8 @@ from printing import print_details, assertions_valcov, assertions_covmat
 import numpy as np
 
 
-from simon_mpl_util.plotting.variable import BasicPrebinnedVariable
-from simon_mpl_util.plotting.cut import NoopOperation, ProjectionOperation, SliceOperation, ProjectAndSliceOperation
+from simonplot.variable import BasicPrebinnedVariable
+from simonplot.cut import NoopOperation, ProjectionOperation, SliceOperation, ProjectAndSliceOperation
 
 def check_operations(dset, target_vals, target_cov, assertfun):
     var1 = BasicPrebinnedVariable()

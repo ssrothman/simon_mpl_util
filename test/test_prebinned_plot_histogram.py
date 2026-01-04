@@ -1,9 +1,9 @@
 from data_factory import synthetic_valcovdataset
-from simon_mpl_util.plotting.plottables import DatasetStack
-from simon_mpl_util.plotting import plot_histogram
-from simon_mpl_util.plotting.variable import BasicPrebinnedVariable, ConstantVariable, WithJacobian, NormalizePerBlock
-from simon_mpl_util.plotting.cut import NoopOperation, ProjectionOperation, SliceOperation, ProjectAndSliceOperation
-from simon_mpl_util.plotting.binning import PrebinnedBinning
+from simonplot.plottables import DatasetStack
+from simonplot import plot_histogram
+from simonplot.variable import BasicPrebinnedVariable, ConstantVariable, WithJacobian, NormalizePerBlock
+from simonplot.cut import NoopOperation, ProjectionOperation, SliceOperation, ProjectAndSliceOperation
+from simonplot.binning import PrebinnedBinning
 
 dset_MC1, _, _ = synthetic_valcovdataset(100000, "MCx1")
 dset_MC2, _, _ = synthetic_valcovdataset(200000, "MCx2")

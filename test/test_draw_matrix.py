@@ -1,10 +1,10 @@
 from data_factory import synthetic_covdataset, synthetic_valcovdataset
-from plotting.variable.PrebinnedVariable import CorrelationFromCovariance
-from simon_mpl_util.plotting import draw_matrix
+from simonplot.variable.PrebinnedVariable import CorrelationFromCovariance
+from simonplot import draw_matrix
 
-from simon_mpl_util.plotting.variable import BasicPrebinnedVariable, ConstantVariable, WithJacobian, NormalizePerBlock
-from simon_mpl_util.plotting.cut import NoopOperation, ProjectionOperation, SliceOperation, ProjectAndSliceOperation
-from simon_mpl_util.plotting.binning import PrebinnedBinning
+from simonplot.variable import BasicPrebinnedVariable, ConstantVariable, WithJacobian, NormalizePerBlock
+from simonplot.cut import NoopOperation, ProjectionOperation, SliceOperation, ProjectAndSliceOperation
+from simonplot.binning import PrebinnedBinning
 
 dset, _, _= synthetic_valcovdataset(100000, "MC")
 
