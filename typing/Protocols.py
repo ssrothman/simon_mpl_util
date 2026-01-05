@@ -141,7 +141,16 @@ class PrebinnedBinningProtocol(BaseBinningProtocol, Protocol):
 
 type AnyBinningProtocol = AutoBinningProtocol | DefaultBinningProtocol | BasicBinningProtocol | PrebinnedBinningProtocol
 
+class HistplotMode(IntEnum):
+    ERRORBAR = 0
+    FILL = 1
+    STACK = 2
+
+@runtime_checkable
 class BaseDatasetProtocol(Protocol):
+    def estimate_yield(self, cut : CutProtocol, weight : VariableProtocol) -> float:
+        ...
+    
     def get_range(self, var : VariableProtocol, cut : CutProtocol) -> Tuple[Any, Any, Any, np.dtype]:
         ...
 
@@ -210,7 +219,8 @@ class BaseDatasetProtocol(Protocol):
                        density: bool,
                        ax : matplotlib.axes.Axes,
                        own_style : bool,
-                       fillbetween : Union[float, None],
+                       mode : HistplotMode,
+                       _fillbetween : Union[float, None] = None,
                        **mpl_kwargs) -> Tuple[Tuple[Any, Any], Any]:
         ...
 

@@ -5,7 +5,7 @@ import awkward as ak
 from simonplot.cut.Cut import NoCut
 from simonplot.util.histplot import simon_histplot, simon_histplot_ratio, simon_histplot_arbitrary, simon_histplot_ratio_arbitrary
 
-from simonplot.typing.Protocols import BaseDatasetProtocol, PrebinnedDatasetAccessProtocol, UnbinnedDatasetAccessProtocol, VariableProtocol, CutProtocol
+from simonplot.typing.Protocols import BaseDatasetProtocol, HistplotMode, PrebinnedDatasetAccessProtocol, UnbinnedDatasetAccessProtocol, VariableProtocol, CutProtocol
 
 from simonpy.AribtraryBinning import ArbitraryBinning
 
@@ -145,6 +145,15 @@ class DatasetBase(ABC):
 class SingleDatasetBase(DatasetBase):
     _H : Any
 
+    def estimate_yield(self, cut : CutProtocol, weight : VariableProtocol) -> float:
+        needed_columns = list(set(cut.columns + weight.columns))
+        
+        self.ensure_columns(needed_columns)
+        wgt = weight.evaluate(self, cut)  # pyright: ignore[reportArgumentType]
+        total_yield = np.nansum(wgt) * self._weight
+
+        return total_yield
+
     @abstractmethod
     def ensure_columns(self, columns: Sequence[str]):
         raise NotImplementedError()
@@ -257,7 +266,8 @@ class SingleDatasetBase(DatasetBase):
                 density: bool,
                 ax : matplotlib.axes.Axes,
                 own_style : bool,
-                fillbetween : Union[float, None],
+                mode : HistplotMode,
+                _fillbetween : Union[float, None] = None,
                 **mpl_kwargs) -> Tuple[Tuple[Any, Any], Any]:
 
         self.fill_hist(variable, cut, weight, axis)
@@ -266,12 +276,19 @@ class SingleDatasetBase(DatasetBase):
             mpl_kwargs['label'] = self.label
             mpl_kwargs['color'] = self.color
 
+        if _fillbetween is not None:
+            fbtw = _fillbetween
+        elif mode != HistplotMode.ERRORBAR:
+            fbtw = 0
+        else:
+            fbtw = None
+
         artist, vals = call_histplot_function(
             self._H, 
             axis,
             ax = ax,
             density=density,
-            fillbetween = fillbetween,
+            fillbetween = fbtw,
             **mpl_kwargs
         )
         return (artist, vals), self._H
@@ -279,6 +296,14 @@ class SingleDatasetBase(DatasetBase):
 class DatasetStackBase(DatasetBase):
     _datasets : Sequence[BaseDatasetProtocol]
     
+    def estimate_yield(self, cut : CutProtocol, weight : VariableProtocol) -> float:
+        return np.sum([d.estimate_yield(cut, weight) for d in self._datasets])
+
+    def order_by_yield(self, cut : CutProtocol, weight : VariableProtocol) -> None:
+        yields = [d.estimate_yield(cut, weight) for d in self._datasets]
+        ordered_indices = np.argsort(yields)
+        self._datasets = [self._datasets[i] for i in ordered_indices]
+
     def get_range(self, var : VariableProtocol, cut : CutProtocol) -> Tuple[Any, Any, Any, np.dtype]:
 
         results = [d.get_range(var, cut) for d in self._datasets]
@@ -359,36 +384,47 @@ class DatasetStackBase(DatasetBase):
         return self.H
 
     def plot_hist(self,
-                       variable: VariableProtocol, 
-                       cut: CutProtocol, 
-                       weight : VariableProtocol,
-                       axis : Any,
-                       density: bool,
-                       ax : matplotlib.axes.Axes,
-                       own_style : bool,
-                       fillbetween : Union[float, None],
-                       **mpl_kwargs) -> Tuple[Any, Tuple[Any, Any]]:
+                variable: VariableProtocol, 
+                cut: CutProtocol, 
+                weight : VariableProtocol,
+                axis : Any,
+                density: bool,
+                ax : matplotlib.axes.Axes,
+                own_style : bool,
+                mode : HistplotMode,
+                _fillbetween : Union[float, None] = None,
+                **mpl_kwargs) -> Tuple[Any, Tuple[Any, Any]]:
         
         if len(self._datasets) == 0:
             raise RuntimeError("DatasetStack.plot_hist: No datasets in stack!")
 
         self.fill_hist(variable, cut, weight, axis)
 
-        if fillbetween is not None and not own_style:
+        if _fillbetween is not None:
+            fbtw = _fillbetween
+        elif mode != HistplotMode.ERRORBAR:
+            fbtw = 0
+        else:
+            fbtw = None
+
+        if mode != HistplotMode.ERRORBAR and not own_style:
             raise ValueError("fillbetween is only supported when own_style is True")
 
-        if own_style and fillbetween is None:
+        if own_style and mode != HistplotMode.STACK:
             mpl_kwargs['label'] = self.label
             mpl_kwargs['color'] = self.color
 
-        prev = fillbetween
-        if prev is not None:
+        if mode == HistplotMode.STACK:
+            self.order_by_yield(cut, weight)
+
+            prev = fbtw
             for d in self._datasets:
                 (artist, vals), _ = d.plot_hist(
                     variable, cut, weight, axis,
                     density, ax,
                     own_style=True,
-                    fillbetween = prev,
+                    _fillbetween = prev,
+                    mode = HistplotMode.FILL,
                     **mpl_kwargs
                 )
                 prev = vals
@@ -400,7 +436,7 @@ class DatasetStackBase(DatasetBase):
                 axis,
                 ax = ax,
                 density=density,
-                fillbetween = fillbetween,
+                fillbetween = fbtw,
                 **mpl_kwargs
             )   
             return (artist, vals), self.H

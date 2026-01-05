@@ -1,6 +1,6 @@
 from bleach import clean
 from simonplot.config.lookuputil import lookup_axis_label
-from simonplot.typing.Protocols import PrebinnedVariableProtocol
+from simonplot.typing.Protocols import HistplotMode, PrebinnedVariableProtocol
 from simonplot.util.common import add_axis_label
 from simonplot.config import config, check_auto_logx
 
@@ -95,20 +95,66 @@ def plot_histogram(variable_: Union[VariableProtocol, List[VariableProtocol]],
     else:
         the_xlabel = variable[0].label 
 
+    '''
+    Decide whether to "resolve" any stacks 
+    (ie plot them as filled stacked histograms for each constituent dataset)
+
+    The logic here is simple:
+        - If there is exactly one stack in the list of datasets, it should be resolved
+        - If there is more than one stack, but only one is an MC stack, resolve the MC stack
+    '''
+    resolve_stack = None
+
     is_stack = np.asarray([d.is_stack for d in dataset])
-    resolve_stacks = np.sum(is_stack) == 1
+    if np.sum(is_stack) == 1:
+        resolve_stack = np.where(is_stack)[0][0]
+    elif np.sum(is_stack) > 1:
+        #if only one MC stack, still can resolve it
+        is_mc_stack = np.asarray([d.is_stack and d.isMC for d in dataset])
+        if np.sum(is_mc_stack) == 1:
+            resolve_stack = np.where(is_mc_stack)[0][0]
     
-    if resolve_stacks:
+    if resolve_stack is not None:
         # make sure to plot resolved stack FIRST
-        whichstack = np.where(is_stack)[0][0]
+        variable = [variable[resolve_stack]] + [variable[i] for i in range(len(variable)) if i != resolve_stack]
+        cut = [cut[resolve_stack]] + [cut[i] for i in range(len(cut)) if i != resolve_stack]
+        weight = [weight[resolve_stack]] + [weight[i] for i in range(len(weight)) if i != resolve_stack]
+        dataset = [dataset[resolve_stack]] + [dataset[i] for i in range(len(dataset)) if i != resolve_stack]
+        labels = [labels[resolve_stack]] + [labels[i] for i in range(len(labels)) if i != resolve_stack]
+        resolve_stack = 0
 
-        variable = [variable[whichstack]] + [variable[i] for i in range(len(variable)) if i != whichstack]
-        cut = [cut[whichstack]] + [cut[i] for i in range(len(cut)) if i != whichstack]
-        weight = [weight[whichstack]] + [weight[i] for i in range(len(weight)) if i != whichstack]
-        dataset = [dataset[whichstack]] + [dataset[i] for i in range(len(dataset)) if i != whichstack]
-        labels = [labels[whichstack]] + [labels[i] for i in range(len(labels)) if i != whichstack]
+    '''
+    Decide whether any datasets should be drawn filled 
+    (ie rather with errorbar style)
 
-    #check if any is data
+    The logic is again very simple:
+     - If we are already resolving a stack, don't fill any others
+     - Otherwise, if there is exactly one MC dataset, fill that one
+     - And plot it first :)
+    '''
+    fill_dataset = None
+    if resolve_stack is None:
+        is_mc = np.asarray([d.isMC for d in dataset])
+        if np.sum(is_mc) == 1:
+            fill_dataset = np.where(is_mc)[0][0]
+
+            #make sure to plot filled dataset FIRST
+            variable = [variable[fill_dataset]] + [variable[i] for i in range(len(variable)) if i != fill_dataset]
+            cut = [cut[fill_dataset]] + [cut[i] for i in range(len(cut)) if i != fill_dataset]
+            weight = [weight[fill_dataset]] + [weight[i] for i in range(len(weight)) if i != fill_dataset]
+            dataset = [dataset[fill_dataset]] + [dataset[i] for i in range(len(dataset)) if i != fill_dataset]
+            labels = [labels[fill_dataset]] + [labels[i] for i in range(len(labels)) if i != fill_dataset]
+
+            fill_dataset = 0
+
+    '''
+    Check if there is any `data` dataset.
+
+    If there is more than one `data` dataset, error out. 
+    Elif there is exactly one, identify it,
+        and if it isn't being resolved or filled, 
+        move it be plotted last
+    '''
     is_data = np.asarray([not d.isMC for d in dataset])
     num_data = np.sum(is_data)
     if num_data > 1:
@@ -117,12 +163,14 @@ def plot_histogram(variable_: Union[VariableProtocol, List[VariableProtocol]],
         isdata = True
 
         which_data = np.where(is_data)[0][0]
-        #reorder such that data is LAST
-        variable = [variable[i] for i in range(len(variable)) if i != which_data] + [variable[which_data]]
-        cut = [cut[i] for i in range(len(cut)) if i != which_data] + [cut[which_data]]
-        weight = [weight[i] for i in range(len(weight)) if i != which_data] + [weight[which_data]]
-        dataset = [dataset[i] for i in range(len(dataset)) if i != which_data] + [dataset[which_data]]
-        labels = [labels[i] for i in range(len(labels)) if i != which_data] + [labels[which_data]]
+
+        if which_data != resolve_stack and which_data != fill_dataset:
+            #reorder such that data is LAST
+            variable = [variable[i] for i in range(len(variable)) if i != which_data] + [variable[which_data]]
+            cut = [cut[i] for i in range(len(cut)) if i != which_data] + [cut[which_data]]
+            weight = [weight[i] for i in range(len(weight)) if i != which_data] + [weight[which_data]]
+            dataset = [dataset[i] for i in range(len(dataset)) if i != which_data] + [dataset[which_data]]
+            labels = [labels[i] for i in range(len(labels)) if i != which_data] + [labels[which_data]]
 
         which_data = len(variable) - 1
         which_ref = which_data
@@ -152,7 +200,7 @@ def plot_histogram(variable_: Union[VariableProtocol, List[VariableProtocol]],
 
     artists = []
     Hs = []
-    for v, c, w, d, l in zip(variable, cut, weight, dataset, labels):
+    for i, (v, c, w, d, l) in enumerate(zip(variable, cut, weight, dataset, labels)):
         if style_from_dset and d.label is not None:
             nolegend = False #force legend if dataset has label
 
@@ -161,7 +209,7 @@ def plot_histogram(variable_: Union[VariableProtocol, List[VariableProtocol]],
             density, ax_main, 
             style_from_dset or (not d.isMC),
             label=l,
-            fillbetween = 0 if (d.is_stack and resolve_stacks) else None
+            mode = HistplotMode.STACK if (d.is_stack and resolve_stack == i) else HistplotMode.ERRORBAR,
         )
         artists.append(artist)
         Hs.append(H)
@@ -215,7 +263,7 @@ def plot_histogram(variable_: Union[VariableProtocol, List[VariableProtocol]],
 
         pad = config['ratiopad']['auto_ylim']['padding'] + maxthreshold
         original_ylim = ax_pad.get_ylim()  # pyright: ignore[reportPossiblyUnboundVariable]
-        print(original_ylim)
+
         ax_pad.set_ylim( # pyright: ignore[reportPossiblyUnboundVariable]
             max(smallest_nontrivial_ratio - pad, original_ylim[0]),
             min(largest_nontrivial_ratio + pad, original_ylim[1])
