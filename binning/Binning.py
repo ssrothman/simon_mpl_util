@@ -105,15 +105,18 @@ class AutoBinning(BinningBase):
 
         minval = np.min(minvals, axis=None)
         maxval = np.max(maxvals, axis=None)
+       
+        dtype = dtypes[0]
 
-        if minval == maxval:
-            minval -= 0.5
-            maxval += 0.5
+        if np.issubdtype(dtype, np.bool_):
+            maxval = int(maxval)
+            minval = int(minval)
+        elif np.issubdtype(dtype, np.floating) and minval == maxval:
+            minval = float(minval) - 0.5
+            maxval = float(maxval) + 0.5
 
         minlen = min(lens)
         
-        dtype = dtypes[0]
-
         if self._force_low is not None:
             minval = self._force_low
         if self._force_high is not None:
@@ -130,12 +133,7 @@ class AutoBinning(BinningBase):
                 transform=transform
             ).build_axis(variables[0])
         else:
-            #one bin for each integer value
-            if isinstance(maxval, np.bool_):
-                maxval = int(maxval)
-            if isinstance(minval, np.bool_):
-                minval = int(minval)
-                
+            #one bin for each integer value                
             nbins = int(maxval - minval + 1)
 
             if transform is not None:
