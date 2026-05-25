@@ -44,6 +44,20 @@ class RelativeResolutionVariable(VariableBase):
         self._gen.set_collection_name(collection_name)
         self._reco.set_collection_name(collection_name)
 
+    def to_pyarrow_expression(self):
+        import pyarrow.compute as pc
+        reco = self._reco.to_pyarrow_expression()
+        gen = self._gen.to_pyarrow_expression()
+        assert(reco is not None)
+        assert(gen is not None)
+        return pc.divide(
+            pc.subtract(
+                reco,
+                gen
+            ),
+            gen
+        )
+
 class Magnitude3dVariable(VariableBase):
     def __init__(self, xvar: VariableProtocol | str, yvar: VariableProtocol | str, zvar: VariableProtocol | str):
         import numpy as np
@@ -106,6 +120,24 @@ class Magnitude3dVariable(VariableBase):
         self._yvar.set_collection_name(collection_name)
         self._zvar.set_collection_name(collection_name)
 
+    def to_pyarrow_expression(self):
+        import pyarrow.compute as pc
+        x = self._xvar.to_pyarrow_expression()
+        y = self._yvar.to_pyarrow_expression()
+        z = self._zvar.to_pyarrow_expression()
+        assert(x is not None)
+        assert(y is not None)
+        assert(z is not None)
+        return pc.sqrt(
+            pc.add(
+                pc.add(
+                    pc.power(x, 2),
+                    pc.power(y, 2)
+                ),
+                pc.power(z, 2)
+            )
+        )
+
 class Magnitude2dVariable(VariableBase):
     def __init__(self, xvar: VariableProtocol | str, yvar: VariableProtocol | str):
         import numpy as np
@@ -156,6 +188,19 @@ class Magnitude2dVariable(VariableBase):
         self._rvar.set_collection_name(collection_name)
         self._xvar.set_collection_name(collection_name)
         self._yvar.set_collection_name(collection_name)
+
+    def to_pyarrow_expression(self):  
+        import pyarrow.compute as pc
+        x = self._xvar.to_pyarrow_expression()
+        y = self._yvar.to_pyarrow_expression()
+        assert(x is not None)
+        assert(y is not None)
+        return pc.sqrt(
+            pc.add(
+                pc.power(x, 2),
+                pc.power(y, 2)
+            )
+        )
 
 class Distance3dVariable(VariableBase):
     def __init__(self, x1var: VariableProtocol | str, y1var: VariableProtocol | str, z1var: VariableProtocol | str, x2var: VariableProtocol | str, y2var: VariableProtocol | str, z2var: VariableProtocol | str):
@@ -227,6 +272,18 @@ class Distance3dVariable(VariableBase):
         self._dzvar.set_collection_name(collection_name)
         self.magnitude_var.set_collection_name(collection_name)
         
+    def to_pyarrow_expression(self):
+        import pyarrow.compute as pc
+        return pc.sqrt(
+            pc.add(
+                pc.add(
+                    pc.power(self._dxvar.to_pyarrow_expression(), 2),
+                    pc.power(self._dyvar.to_pyarrow_expression(), 2)
+                ),
+                pc.power(self._dzvar.to_pyarrow_expression(), 2)
+            )
+        )
+    
 class DeltaPhiVariable(VariableBase):
     def __init__(self, phi1 : VariableProtocol | str, phi2: VariableProtocol | str):
         if isinstance(phi1, str):
@@ -272,6 +329,20 @@ class DeltaPhiVariable(VariableBase):
         dphi = phi1val - phi2val
         dphi = np.where(dphi > np.pi, dphi - 2*np.pi, dphi)
         dphi = np.where(dphi < -np.pi, dphi + 2*np.pi, dphi)
+        return dphi
+
+    def to_pyarrow_expression(self):
+        import pyarrow.compute as pc
+        import numpy as np
+
+        phi1 = self._phi1.to_pyarrow_expression()
+        phi2 = self._phi2.to_pyarrow_expression()
+        assert(phi1 is not None)
+        assert(phi2 is not None)
+
+        dphi = pc.subtract(phi1, phi2)
+        dphi = pc.if_else(pc.greater(dphi, np.pi), pc.subtract(dphi, 2*np.pi), dphi)
+        dphi = pc.if_else(pc.less(dphi, -np.pi), pc.add(dphi, 2*np.pi), dphi)
         return dphi
 
 class DeltaRVariable(VariableBase):
@@ -334,6 +405,31 @@ class DeltaRVariable(VariableBase):
     def evaluate(self, dataset, cut):
         return self._dr.evaluate(dataset, cut)
     
+    def to_pyarrow_expression(self):
+        import pyarrow.compute as pc
+        import numpy as np
+
+        eta1 = self._eta1.to_pyarrow_expression()
+        phi1 = self._phi1.to_pyarrow_expression()
+        eta2 = self._eta2.to_pyarrow_expression()
+        phi2 = self._phi2.to_pyarrow_expression()
+        assert(eta1 is not None)
+        assert(phi1 is not None)
+        assert(eta2 is not None)
+        assert(phi2 is not None)    
+
+        deta = pc.subtract(eta1, eta2)
+        dphi = pc.subtract(phi1, phi2)
+        dphi = pc.if_else(pc.greater(dphi, np.pi), pc.subtract(dphi, 2*np.pi), dphi)
+        dphi = pc.if_else(pc.less(dphi, -np.pi), pc.add(dphi, 2*np.pi), dphi)
+
+        return pc.sqrt(
+            pc.add(
+                pc.power(deta, 2),
+                pc.power(dphi, 2)
+            )
+        )
+
 class Distance2dVariable(VariableBase):
     def __init__(self, x1var, y1var, x2var, y2var):
         import numpy as np
@@ -379,6 +475,15 @@ class Distance2dVariable(VariableBase):
         self._dxvar.set_collection_name(collection_name)
         self._dyvar.set_collection_name(collection_name)
         self.magnitude_var.set_collection_name(collection_name)
+
+    def to_pyarrow_expression(self):
+        import pyarrow.compute as pc
+        return pc.sqrt(
+            pc.add(
+                pc.power(self._dxvar.to_pyarrow_expression(), 2),
+                pc.power(self._dyvar.to_pyarrow_expression(), 2)
+            )
+        )
 
 class EtaFromXYZVariable(VariableBase):
     def __init__(self, x : VariableProtocol | str, y: VariableProtocol | str, z: VariableProtocol | str):
@@ -429,6 +534,9 @@ class EtaFromXYZVariable(VariableBase):
 
         return xyz_to_eta_phi(xval, yval, zval)[0]
     
+    def to_pyarrow_expression(self):
+        raise NotImplementedError("EtaFromXYZVariable does not currently support to_pyarrow_expression. This is because the transformation from XYZ to eta/phi is non-trivial to express in pyarrow, and we have not yet implemented it. If you need this functionality, please open an issue or submit a pull request implementing it.")
+
 class PhiFromXYZVariable(VariableBase):
     def __init__(self, x : VariableProtocol | str, y: VariableProtocol | str, z: VariableProtocol | str):
         if isinstance(x, str):
@@ -477,3 +585,6 @@ class PhiFromXYZVariable(VariableBase):
         zval = self._z.evaluate(dataset, cut)
 
         return xyz_to_eta_phi(xval, yval, zval)[1]
+
+    def to_pyarrow_expression(self):
+        raise NotImplementedError("PhiFromXYZVariable does not currently support to_pyarrow_expression. This is because the transformation from XYZ to eta/phi is non-trivial to express in pyarrow, and we have not yet implemented it. If you need this functionality, please open an issue or submit a pull request implementing it.")

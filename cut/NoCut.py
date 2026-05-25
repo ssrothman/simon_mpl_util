@@ -25,3 +25,6 @@ class NoCut(UnbinnedCutBase):
     
     def set_collection_name(self, collection_name):
         pass
+
+    def to_pyarrow_expression(self):
+        return None

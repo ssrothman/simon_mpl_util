@@ -95,6 +95,23 @@ class AndCuts(UnbinnedCutBase):
         
         return True
 
+    def to_pyarrow_expression(self):
+        import pyarrow.compute as pc
+        exprs = []
+        for cut in self._cuts:
+            cut_expr = cut.to_pyarrow_expression()
+            if cut_expr is not None:
+                exprs.append(cut_expr)
+        
+        if len(exprs) == 0:
+            return None
+        
+        combined = exprs[0]
+        for expr in exprs[1:]:
+            combined = pc.and_(combined, expr)
+        
+        return combined
+
 class OrCuts(UnbinnedCutBase):
     # get in before __init__ and sometimes return a different class
     def __new__(cls, cuts : Sequence[CutProtocol]):
@@ -170,6 +187,22 @@ class OrCuts(UnbinnedCutBase):
         
         return True
 
+    def to_pyarrow_expression(self):
+        import pyarrow.compute as pc
+        exprs = []
+        for cut in self._cuts:
+            cut_expr = cut.to_pyarrow_expression()
+            if cut_expr is not None:
+                exprs.append(cut_expr)
+        
+        if len(exprs) == 0:
+            return None
+        
+        combined = exprs[0]
+        for expr in exprs[1:]:
+            combined = pc.or_(combined, expr)
+        
+        return combined
 
 class NotCut(UnbinnedCutBase):
     def __init__(self, cut : CutProtocol):
@@ -206,3 +239,11 @@ class NotCut(UnbinnedCutBase):
             return False
 
         return self._cut == other._cut
+    
+    def to_pyarrow_expression(self):
+        import pyarrow.compute as pc
+        cut_expr = self._cut.to_pyarrow_expression()
+        if cut_expr is None:
+            return None
+        else:
+            return pc.invert(cut_expr)

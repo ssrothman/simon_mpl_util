@@ -18,6 +18,7 @@ from typing import List, Union, override
 
 from .DatasetBase import SingleDatasetBase, DatasetStackBase, DatasetComparisonBase
 from simonplot.typing.Protocols import BaseDatasetProtocol
+import pyarrow._compute as pc2
 
 class DatasetStack(DatasetStackBase):
     def __init__(self, key : str, color : str | None, label : str, datasets : list[BaseDatasetProtocol], showstack : bool = True):
@@ -26,6 +27,27 @@ class DatasetStack(DatasetStackBase):
         self._label = label
         self._datasets = datasets
         self._showStack = showstack
+
+    def streaming_fill_histogram(self, H : hist.Hist, 
+                                 variables : dict[str, ds.Expression], 
+                                 weight : ds.Expression | None,
+                                 mask : ds.Expression | None,
+                                 batch_size : int = 1 << 20,
+                                 batch_readahead : int = 4,
+                                 fragment_readahead : int = 4,
+                                 use_threads : bool = True):
+        import pyarrow.compute as pc
+        # Specialized method to fill a histogram in a streaming way, without loading the entire dataset into memory.
+        # This is useful for very large datasets that cannot fit into memory.
+        for dataset in self._datasets:
+            assert isinstance(dataset, DatasetStack) or isinstance(dataset, ParquetDataset), "Currently only ParquetDataset and DatasetStack are supported in DatasetStack for streaming_fill_histogram"
+            dataset.streaming_fill_histogram(
+                H, 
+                variables, weight, mask, 
+                batch_size, 
+                batch_readahead, fragment_readahead, 
+                use_threads
+            )
         
 class DatasetComparison(DatasetComparisonBase):
     def __init__(self, key : str, color : str | None, label : str, ylabel : str, dataset1 : BaseDatasetProtocol, dataset2 : BaseDatasetProtocol, kind : ComparisonHistStruct._SUPPORTED_MODES):
@@ -131,3 +153,34 @@ class ParquetDataset(SingleDatasetBase):
     @property
     def schema(self):
         return self._dataset.schema
+
+    def streaming_fill_histogram(self, H : hist.Hist, 
+                                 variables : dict[str, ds.Expression], 
+                                 weight : ds.Expression | None,
+                                 mask : ds.Expression | None,
+                                 batch_size : int = 1 << 20,
+                                 batch_readahead : int = 1,
+                                 fragment_readahead : int = 1,
+                                 use_threads : bool = True):
+        # Specialized method to fill a histogram in a streaming way, without loading the entire dataset into memory.
+        # This is useful for very large datasets that cannot fit into memory.
+
+        # Create an iterator over the dataset in batches
+        columns = variables
+        if weight is not None:
+            import pyarrow.compute as pc
+            columns['weight'] = pc.multiply(weight, self._weight)
+            
+        iterator = self._dataset.to_batches(
+            columns = columns,
+            filter = mask,
+            batch_size = batch_size,
+            batch_readahead = batch_readahead,
+            fragment_readahead = fragment_readahead,
+            use_threads = use_threads,
+        )
+        from tqdm import tqdm
+        iterator = tqdm(iterator, desc='Filling histogram', unit='batch')
+        for batch in iterator:
+            # Evaluate the variables and weights for the current batch
+            H.fill(**{name : value for name, value in zip(batch.column_names, batch.columns)})

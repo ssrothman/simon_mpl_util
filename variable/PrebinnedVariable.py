@@ -8,22 +8,26 @@ from .VariableBase import VariableBase
 from typing import Sequence, Tuple, assert_never, override, List
 import numpy as np
 
-class BasicPrebinnedVariable(VariableBase):
+class PrebinnedVariableBase(VariableBase):
+    @property
+    def columns(self):
+        return []
+
+    @property
+    def prebinned(self) -> bool:
+        return True
+    
+    def to_pyarrow_expression(self):
+        raise NotImplementedError("PrebinnedVariable does not support conversion to pyarrow expression!")
+
+class BasicPrebinnedVariable(PrebinnedVariableBase):
     def __init__(self):
         pass #stateless
     
     @property
     def _natural_centerline(self):
         return None
-    
-    @property 
-    def columns(self):
-        return []
-    
-    @property
-    def prebinned(self) -> bool:
-        return True
-    
+        
     def evaluate(self, dataset, cut):
         return cut.evaluate(dataset)
 
@@ -66,7 +70,7 @@ class BasicPrebinnedVariable(VariableBase):
             'clip_positiveinf' : {}
         }
 
-class WithJacobian(VariableBase):
+class WithJacobian(PrebinnedVariableBase):
     def __init__(self, 
                  variable : PrebinnedVariableProtocol, 
                  wrt : Sequence[str],
@@ -85,15 +89,7 @@ class WithJacobian(VariableBase):
     @property
     def _natural_centerline(self):
         return None
-    
-    @property
-    def columns(self):
-        return []
-    
-    @property
-    def prebinned(self) -> bool:
-        return True
-    
+        
     def evaluate(self, dataset, cut):
         if not isinstance(cut, PrebinnedOperationProtocol):
             raise ValueError("PrebinnedDensityVariable requires a PrebinnedOperationProtocol cut")
@@ -148,7 +144,7 @@ class WithJacobian(VariableBase):
 '''
 Nearly identical to NormalizePerBlock, but normalizes to mean value instead of to integral
 '''
-class DivideOutProfile(VariableBase):
+class DivideOutProfile(PrebinnedVariableBase):
     def __init__(self, variable : PrebinnedVariableProtocol, axes : List[str]):
         self._var = variable
         self._axes = axes
@@ -165,15 +161,7 @@ class DivideOutProfile(VariableBase):
     @property
     def _natural_centerline(self):
         return 1.0
-    
-    @property
-    def columns(self):
-        return []
-    
-    @property
-    def prebinned(self) -> bool:
-        return True
-    
+        
     def evaluate(self, dataset, cut):
         if not isinstance(cut, PrebinnedOperationProtocol):
             raise ValueError("DivideOutProfile requires a PrebinnedOperationProtocol cut")
@@ -216,7 +204,7 @@ class DivideOutProfile(VariableBase):
     def jac_details(self) -> dict:
         return self._var.jac_details
     
-class NormalizePerBlock(VariableBase):
+class NormalizePerBlock(PrebinnedVariableBase):
     def __init__(self, variable : PrebinnedVariableProtocol, axes : List[str]):
         self._var = variable
         self._axes = axes
@@ -232,14 +220,6 @@ class NormalizePerBlock(VariableBase):
     @property
     def _natural_centerline(self):
         return None
-    
-    @property
-    def columns(self):
-        return []
-    
-    @property
-    def prebinned(self) -> bool:
-        return True
     
     def evaluate(self, dataset, cut):
         if not isinstance(cut, PrebinnedOperationProtocol):
@@ -289,7 +269,7 @@ class NormalizePerBlock(VariableBase):
     def jac_details(self) -> dict:
         return self._var.jac_details        
 
-class CorrelationFromCovariance(VariableBase):
+class CorrelationFromCovariance(PrebinnedVariableBase):
     def __init__(self, variable : PrebinnedVariableProtocol):
         self._var = variable
 
@@ -300,14 +280,6 @@ class CorrelationFromCovariance(VariableBase):
     def _natural_centerline(self):
         return 0
 
-    @property
-    def columns(self):
-        return []
-    
-    @property
-    def prebinned(self) -> bool:
-        return True
-    
     def __eq__(self, other) -> bool:
         if not isinstance(other, CorrelationFromCovariance):
             return False
@@ -374,21 +346,13 @@ class CorrelationFromCovariance(VariableBase):
     def jac_details(self) -> dict:
         return self._var.jac_details
 
-class _ExtractCovarianceMatrix(VariableBase):
+class _ExtractCovarianceMatrix(PrebinnedVariableBase):
     def __init__(self, variable : PrebinnedVariableProtocol):
         self._var = variable
 
     @property
     def _natural_centerline(self):
         return 0
-
-    @property
-    def columns(self):
-        return []
-    
-    @property
-    def prebinned(self) -> bool:
-        return True
     
     def __eq__(self, other) -> bool:
         if not isinstance(other, _ExtractCovarianceMatrix):
@@ -416,6 +380,68 @@ class _ExtractCovarianceMatrix(VariableBase):
                 raise RuntimeError("ExtractCovarianceMatrix needs covariance!!")
             
             return cov
+    
+    @property
+    def hasjacobian(self) -> bool:
+        return self._var.hasjacobian
+    
+    @property
+    def normalized_blocks(self) -> List[str]:
+        return self._var.normalized_blocks
+    
+    @property
+    def normalized_by_err(self) -> bool:
+        return self._var.normalized_by_err
+    
+    @property
+    def jac_details(self) -> dict:
+        return self._var.jac_details
+
+class RelativeErrorVariable(PrebinnedVariableBase):
+    def __init__(self, variable : PrebinnedVariableProtocol):
+        self._var = variable
+
+    @property
+    def _natural_centerline(self):
+        return 0
+    
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, RelativeErrorVariable):
+            return False
+        return (self._var == other._var)
+    
+    @property 
+    def key(self):
+        return "RelativeError(%s)" % self._var.key
+
+    def set_collection_name(self, collection_name):
+        raise ValueError("Prebinned Variables do not support set_collection_name")
+    
+    def evaluate(self, dataset, cut):
+        if not isinstance(cut, PrebinnedOperationProtocol):
+            raise ValueError("RelativeErrorVariable requires a PrebinnedOperationProtocol cut")
+
+        evaluated = self._var.evaluate(dataset, cut)
+        hist, cov, _, _ = maybe_valcov_to_definitely_valcov(evaluated)
+
+        if hist is None or cov is None:
+            raise RuntimeError("RelativeErrorVariable needs histogram values and covariance!!")
+        
+        diag = dataset.get_diag(cov, self, cut)
+        if isinstance(diag, tuple):
+            # xdiag and ydiag are different
+            xdiag, ydiag = diag
+            xerrs = np.sqrt(xdiag)
+            yerrs = np.sqrt(ydiag)
+            errs = np.outer(yerrs, xerrs)
+        else:
+            # one unified diagonal
+            errs = np.sqrt(diag)
+
+        relative_err = errs/hist
+        relative_err[hist==0] = 1 #define relative error to be 100% where histogram is zero
+        
+        return relative_err, np.zeros_like(cov) 
     
     @property
     def hasjacobian(self) -> bool:

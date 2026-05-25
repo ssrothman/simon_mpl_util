@@ -5,7 +5,7 @@ import numpy as np
 import hist
 from enum import IntEnum
 from typing import overload
-
+import pyarrow.dataset as ds
 from simonpy.AbitraryBinning import ArbitraryBinning
 
 @runtime_checkable
@@ -32,6 +32,9 @@ class VariableLikeProtocol(HasKeyProtocol, Protocol):
         ...
 
     def __eq__(self, other) -> bool:
+        ...
+
+    def to_pyarrow_expression(self) -> ds.Expression | None:
         ...
 
 @runtime_checkable

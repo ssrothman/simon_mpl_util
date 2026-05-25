@@ -182,13 +182,13 @@ class ProjectAndSliceOperation(PrebinnedOperationBase):
     def evaluate(self, dataset):
         dataset = self.ensure_valid_dataset(dataset)   
         
-        projdata = self._projection.evaluate(dataset)
-        projbinning = self._projection.resulting_binning(dataset.binning)
-        proj_dset = dataset._dummy_dset(projdata, projbinning)
+        slicedata = self._slice.evaluate(dataset)
+        sliced_binning = dataset.binning.get_sliced_binning(self._slice._edges)
+        sliced_dset = dataset._dummy_dset(slicedata, sliced_binning)
 
-        return self._slice.evaluate(proj_dset)
+        return self._projection.evaluate(sliced_dset)
     
     def _compute_resulting_binning(self, binning : ArbitraryBinning) -> ArbitraryBinning:
-        proj_binning = self._projection.resulting_binning(binning)
-        slice_binning = self._slice._compute_resulting_binning(proj_binning)
-        return slice_binning
+        slice_binning = self._slice.resulting_binning(binning)
+        proj_binning = self._projection._compute_resulting_binning(slice_binning)
+        return proj_binning

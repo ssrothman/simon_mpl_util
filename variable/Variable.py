@@ -30,6 +30,7 @@ class ConstantVariable(VariableBase):
     def evaluate(self, dataset, cut):
         return np.asarray(self._value)
         
+        '''
         if cut is None:
             mask = slice(None)
         else:
@@ -46,6 +47,7 @@ class ConstantVariable(VariableBase):
             assert_never(mask)
 
         return val[mask]
+        '''
     
     @property
     def key(self):
@@ -59,6 +61,10 @@ class ConstantVariable(VariableBase):
             return False
         
         return self._value == other._value
+
+    def to_pyarrow_expression(self):
+        import pyarrow.compute as pc
+        return pc.scalar(self._value)
 
 class BasicVariable(VariableBase):
     def __init__(self, name : str, collection_name: str | None = None):
@@ -117,6 +123,13 @@ class BasicVariable(VariableBase):
     def set_collection_name(self, collection_name):
         self._collection_name = collection_name
 
+    def to_pyarrow_expression(self):
+        import pyarrow.compute as pc
+        if self._collection_name is None:
+            return pc.field(self._name)
+        else:
+            return pc.field(self._collection_name + "." + self._name)
+
 class AkNumVariable(VariableBase):
     def __init__(self, var : VariableProtocol | str):
         self._var = BasicVariable(var) if isinstance(var, str) else var
@@ -150,6 +163,9 @@ class AkNumVariable(VariableBase):
     
     def set_collection_name(self, collection_name):
         raise ValueError("AkNumVariable does not support set_collection_name")
+
+    def to_pyarrow_expression(self):
+        raise NotImplementedError("AkNumVariable does not support to_pyarow_expression()")
 
 class RatioVariable(VariableBase):
     def __init__(self, num : VariableProtocol | str, denom : VariableProtocol | str):
@@ -185,6 +201,14 @@ class RatioVariable(VariableBase):
         self._num.set_collection_name(collection_name)
         self._denom.set_collection_name(collection_name)
 
+    def to_pyarrow_expression(self):
+        import pyarrow.compute as pc
+        num = self._num.to_pyarrow_expression()
+        denom = self._denom.to_pyarrow_expression()
+        assert(num is not None)
+        assert(denom is not None)
+        return pc.divide(num, denom)
+
 class ProductVariable(VariableBase):
     def __init__(self, var1 : VariableProtocol | str, var2 : VariableProtocol | str):
         self._var1 = BasicVariable(var1) if isinstance(var1, str) else var1
@@ -218,7 +242,15 @@ class ProductVariable(VariableBase):
     def set_collection_name(self, collection_name):
         self._var1.set_collection_name(collection_name)
         self._var2.set_collection_name(collection_name)
-        
+    
+    def to_pyarrow_expression(self):
+        import pyarrow.compute as pc
+        var1_expr = self._var1.to_pyarrow_expression()
+        var2_expr = self._var2.to_pyarrow_expression()
+        assert(var1_expr is not None)
+        assert(var2_expr is not None)
+        return pc.multiply(var1_expr, var2_expr)
+
 class DifferenceVariable(VariableBase):
     def __init__(self, var1 : VariableProtocol | str, var2 : VariableProtocol | str):
         self._var1 = BasicVariable(var1) if isinstance(var1, str) else var1
@@ -253,6 +285,14 @@ class DifferenceVariable(VariableBase):
         self._var1.set_collection_name(collection_name)
         self._var2.set_collection_name(collection_name)
 
+    def to_pyarrow_expression(self):
+        import pyarrow.compute as pc
+        var2_expr = self._var2.to_pyarrow_expression()
+        var1_expr = self._var1.to_pyarrow_expression()
+        assert(var2_expr is not None)
+        assert(var1_expr is not None)
+        return pc.subtract(var2_expr, var1_expr)
+
 class SumVariable(VariableBase):
     def __init__(self, var1 : VariableProtocol | str, var2 : VariableProtocol | str):
         self._var1 = BasicVariable(var1) if isinstance(var1, str) else var1
@@ -285,6 +325,14 @@ class SumVariable(VariableBase):
     def set_collection_name(self, collection_name):
         self._var1.set_collection_name(collection_name)
         self._var2.set_collection_name(collection_name)
+
+    def to_pyarrow_expression(self):
+        import pyarrow.compute as pc
+        var1_expr = self._var1.to_pyarrow_expression()
+        var2_expr = self._var2.to_pyarrow_expression()
+        assert(var1_expr is not None)
+        assert(var2_expr is not None)
+        return pc.add(var1_expr, var2_expr)
 
 class CorrectionlibVariable(VariableBase):
     def __init__(self, var_l : Sequence[VariableProtocol | str], path : str, key : str):
@@ -342,6 +390,9 @@ class CorrectionlibVariable(VariableBase):
 
         return True
     
+    def to_pyarrow_expression(self):
+        raise NotImplementedError("CorrectionlibVariable does not support to_pyarrow_expression()")
+    
 class UFuncVariable(VariableBase):
     def __init__(self, var : VariableProtocol | str, ufunc):
         self._var = BasicVariable(var) if isinstance(var, str) else var
@@ -374,6 +425,9 @@ class UFuncVariable(VariableBase):
 
     def set_collection_name(self, collection_name):
         self._var.set_collection_name(collection_name)
+
+    def to_pyarrow_expression(self):
+        raise NotImplementedError("UFuncVariable does not support to_pyarrow_expression()")
 
 class ProfileVariable(VariableBase):
     def __init__(self, 
@@ -441,6 +495,9 @@ class ProfileVariable(VariableBase):
         self._xvar.set_collection_name(collection_name)
         self._yvar.set_collection_name(collection_name)
 
+    def to_pyarrow_expression(self):
+        raise NotImplementedError("ProfileVariable does not support to_pyarrow_expression()")
+
 class RateVariable(VariableBase):
     def __init__(self, binaryfield : VariableProtocol | str, wrt : VariableProtocol | str):
         self._binaryfield = BasicVariable(binaryfield) if isinstance(binaryfield, str) else binaryfield
@@ -490,6 +547,9 @@ class RateVariable(VariableBase):
         self._binaryfield.set_collection_name(collection_name)
         self._wrt.set_collection_name(collection_name)
 
+    def to_pyarrow_expression(self):
+        raise NotImplementedError("RateVariable does not support to_pyarrow_expression()")
+
 class AbsVariable(VariableBase):
     def __init__(self, var : VariableProtocol | str):
         self._var = BasicVariable(var) if isinstance(var, str) else var
@@ -521,6 +581,12 @@ class AbsVariable(VariableBase):
 
     def set_collection_name(self, collection_name):
         self._var.set_collection_name(collection_name)
+
+    def to_pyarrow_expression(self):
+        import pyarrow.compute as pc
+        x = self._var.to_pyarrow_expression()
+        assert(x is not None)
+        return pc.abs(x)
 
 class LogVariable(VariableBase):
     def __init__(self, var : VariableProtocol | str, base : float | int | None = None):
@@ -576,6 +642,19 @@ class LogVariable(VariableBase):
 
     def set_collection_name(self, collection_name):
         self._var.set_collection_name(collection_name)
+
+    def to_pyarrow_expression(self):
+        import pyarrow.compute as pc
+        x = self._var.to_pyarrow_expression()
+        assert(x is not None)
+        if self._base is None:
+            return pc.ln(x)
+        elif self._base == 10:
+            return pc.log10(x)
+        elif self._base == 2:
+            return pc.log2(x)
+        else:
+            return pc.logb(x, self._base)
 
 class ConcatVariable(VariableBase):
     def __init__(self, vars : Sequence[VariableProtocol | str], keyvar : VariableProtocol | str | None = None):
@@ -645,6 +724,9 @@ class ConcatVariable(VariableBase):
 
         self._keyvar.set_collection_name(collection_name)
 
+    def to_pyarrow_expression(self):
+        raise NotImplementedError("ConcatVariable does not support to_pyarrow_expression()")
+
 class VariableFromCut(VariableBase):
     def __init__(self, cut : CutProtocol):
         self._cut = cut
@@ -678,3 +760,6 @@ class VariableFromCut(VariableBase):
     
     def set_collection_name(self, collection_name):
         self._cut.set_collection_name(collection_name)
+
+    def to_pyarrow_expression(self):
+        raise NotImplementedError("VariableFromCut does not support to_pyarrow_expression()")

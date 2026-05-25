@@ -47,6 +47,12 @@ class EqualsCut(UnbinnedCutBase):
     def set_collection_name(self, collection_name):
         self._variable.set_collection_name(collection_name)
 
+    def to_pyarrow_expression(self):
+        import pyarrow.compute as pc
+        x = self._variable.to_pyarrow_expression()
+        assert(x is not None)
+        return pc.equal(x, self._value)
+
 class AllEqualCut(UnbinnedCutBase):
     def __init__(self, variables : List[VariableProtocol | str], value : float | int):
         self._value = value
@@ -103,6 +109,20 @@ class AllEqualCut(UnbinnedCutBase):
         for var in self._variables:
             var.set_collection_name(collection_name)
 
+    def to_pyarrow_expression(self):
+        import pyarrow.compute as pc
+        exprs = []
+        for var in self._variables:
+            var_expr = var.to_pyarrow_expression()
+            assert(var_expr is not None)
+            exprs.append(pc.equal(var_expr, self._value))
+        
+        combined = exprs[0]
+        for expr in exprs[1:]:
+            combined = pc.and_(combined, expr)
+        
+        return combined
+
 class TwoSidedCut(UnbinnedCutBase):
     def __init__(self, variable : VariableProtocol | str, low : float | int, high : float | int):
         self._low = low
@@ -146,6 +166,15 @@ class TwoSidedCut(UnbinnedCutBase):
     def set_collection_name(self, collection_name):
         self._variable.set_collection_name(collection_name)
 
+    def to_pyarrow_expression(self):
+        import pyarrow.compute as pc
+        x = self._variable.to_pyarrow_expression()
+        assert(x is not None)
+        return pc.and_(
+            pc.greater_equal(x, self._low),
+            pc.less(x, self._high)
+        )
+
 class GreaterThanCut(UnbinnedCutBase):
     def __init__(self, variable : VariableProtocol | str , value : int | float):
         self._value = value
@@ -180,6 +209,12 @@ class GreaterThanCut(UnbinnedCutBase):
     def set_collection_name(self, collection_name):
         self._variable.set_collection_name(collection_name)
 
+    def to_pyarrow_expression(self):
+        import pyarrow.compute as pc
+        x = self._variable.to_pyarrow_expression()
+        assert(x is not None)
+        return pc.greater_equal(x, self._value)
+
 class LessThanCut(UnbinnedCutBase):
     def __init__(self, variable : VariableProtocol | str, value : int | float):
         self._value = value
@@ -211,6 +246,12 @@ class LessThanCut(UnbinnedCutBase):
             return False
         
         return self._variable == other._variable and self._value == other._value
+
+    def to_pyarrow_expression(self):
+        import pyarrow.compute as pc
+        x = self._variable.to_pyarrow_expression()
+        assert(x is not None)
+        return pc.less(x, self._value)
 
     def set_collection_name(self, collection_name):
         self._variable.set_collection_name(collection_name)

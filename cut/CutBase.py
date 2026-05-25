@@ -89,3 +89,6 @@ class PrebinnedOperationBase(CutBase):
     def clear_resulting_binning_cache(self):
         if hasattr(self, '_resulting_binning'):
             del self._resulting_binning
+
+    def to_pyarrow_expression(self):
+        raise NotImplementedError("PrebinnedOperations do not support pyarrow expressions")
