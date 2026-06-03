@@ -68,7 +68,6 @@ class ComparisonHistStruct:
             raise ValueError(f"Unsupported mode {self._mode} for ComparisonHistStruct! Supported modes are: 'ratio' and 'difference'.")
 
     
-    #just return 0 for uncertainties atm
     def variances(self, flow=False):
         H1sum = self._hist1.values(flow=True).sum()
         H2sum = self._hist2.values(flow=True).sum()

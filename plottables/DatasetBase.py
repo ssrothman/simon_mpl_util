@@ -458,8 +458,8 @@ class DatasetComparisonBase(DatasetBase):
             raise RuntimeError("DatasetComparison.binning: dataset1 is not a prebinned dataset!")
         if not isinstance(self._dataset2, PrebinnedDatasetAccessProtocol):
             raise RuntimeError("DatasetComparison.binning: dataset2 is not a prebinned dataset!")
-        if self._dataset1.binning != self._dataset2.binning:
-            raise RuntimeError("DatasetComparison.binning: dataset1 and dataset2 have different binnings!")
+        #if self._dataset1.binning != self._dataset2.binning:
+        #    raise RuntimeError("DatasetComparison.binning: dataset1 and dataset2 have different binnings!")
         return self._dataset1.binning
     
     @property
