@@ -148,9 +148,10 @@ def place_text(ax, text, loc, fontsize=24, bbox_opts={}):
     #attempt to copy the "best" location logic from matplotlib's legend
     badnesses = []
 
-    other_lines, other_offsets, other_bboxes = get_other_objects(ax)
 
     if loc == 'best':
+        other_lines, other_offsets, other_bboxes = get_other_objects(ax)
+
         for opt in options:
             text_bbox = get_text_bbox(ax, text, opt, fontsize, bbox_opts)
             text_bbox = text_bbox.expanded(1.1, 1.1)  #add padding

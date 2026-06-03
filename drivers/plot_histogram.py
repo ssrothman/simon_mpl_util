@@ -32,6 +32,7 @@ def plot_histogram(variable_: Union[VariableProtocol, List[VariableProtocol]],
                    binning : BaseBinningProtocol,
                    labels_: Union[List[str], None] = None,
                    extratext : Union[str, None] = None,
+                   textloc : str | int | Tuple[float, float, str, str] = 'best',
                    density: bool = False,
                    logx: Union[bool, None] = None,
                    logy: bool | None = None,
@@ -42,6 +43,7 @@ def plot_histogram(variable_: Union[VariableProtocol, List[VariableProtocol]],
                    output_prefix: Union[str, None] = None,
                    override_filename: Union[str, None] = None,
                    override_ylabel : Union[str, None] = None,
+                   override_ratiopad_ylim : Tuple[float, float] | None = None,
                    extra_stuff : List[Any] = []):
 
     if labels_ is None or len(labels_) == 1:
@@ -186,14 +188,14 @@ def plot_histogram(variable_: Union[VariableProtocol, List[VariableProtocol]],
     '''
     is_data = np.asarray([not d.isMC for d in dataset])
     num_data = np.sum(is_data)
-    if num_data > 1:
-        raise RuntimeError("Cannot plot more than one data dataset")
-    elif num_data == 1:
+    #if num_data > 1:
+    #    raise RuntimeError("Cannot plot more than one data dataset")
+    if num_data >= 1:
         isdata = True
 
         which_data = np.where(is_data)[0][0]
 
-        if which_data != resolve_stack and which_data != fill_dataset:
+        if which_data != resolve_stack and which_data != fill_dataset and num_data==1:
             #reorder such that data is LAST
             variable = [variable[i] for i in range(len(variable)) if i != which_data] + [variable[which_data]]
             cut = [cut[i] for i in range(len(cut)) if i != which_data] + [cut[which_data]]
@@ -243,7 +245,7 @@ def plot_histogram(variable_: Union[VariableProtocol, List[VariableProtocol]],
         artist, H = d.plot_hist(
             v, c, w, axis[i], 
             density, ax_main, 
-            style_from_dset or (not d.isMC),
+            style_from_dset,
             label=l,
             mode = HistplotMode.STACK if (d.is_stack and resolve_stack == i) else HistplotMode.ERRORBAR,
         )
@@ -308,10 +310,17 @@ def plot_histogram(variable_: Union[VariableProtocol, List[VariableProtocol]],
         pad = config['ratiopad']['auto_ylim']['padding'] + maxthreshold
         original_ylim = ax_pad.get_ylim()  # pyright: ignore[reportPossiblyUnboundVariable]
 
-        ax_pad.set_ylim( # pyright: ignore[reportPossiblyUnboundVariable]
-            max(smallest_nontrivial_ratio - pad, original_ylim[0]),
-            min(largest_nontrivial_ratio + pad, original_ylim[1])
-        )
+        print("OVERRIDE_RATIOPAD_YLIM:", override_ratiopad_ylim)
+        if override_ratiopad_ylim is not None: 
+            ax_pad.set_ylim( # pyright: ignore[reportPossiblyUnboundVariable]
+                override_ratiopad_ylim[0],
+                override_ratiopad_ylim[1]
+            )
+        else:
+            ax_pad.set_ylim( # pyright: ignore[reportPossiblyUnboundVariable]
+                max(smallest_nontrivial_ratio - pad, original_ylim[0]),
+                min(largest_nontrivial_ratio + pad, original_ylim[1])
+            )
         
         if isinstance(axis[0], ArbitraryBinning) and axis[0].Nax == 1 and axis[0].label_lookup() is not None:
             pass
@@ -556,7 +565,7 @@ def plot_histogram(variable_: Union[VariableProtocol, List[VariableProtocol]],
 
     draw_legend(ax_main, nolegend)
 
-    add_text(ax_main, cut, extratext)
+    add_text(ax_main, cut, extratext, loc=textloc)
 
     fig.tight_layout()
 

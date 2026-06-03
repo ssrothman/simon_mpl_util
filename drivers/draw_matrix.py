@@ -1,5 +1,5 @@
 import os
-from typing import Union, List, Literal, get_args
+from typing import Union, List, Literal, get_args, Tuple
 
 import matplotlib
 from matplotlib.colors import Normalize, SymLogNorm, LogNorm
@@ -19,6 +19,7 @@ def draw_matrix(variable : PrebinnedVariableProtocol,
                 dataset: PrebinnedDatasetProtocol,
                 binning : PrebinnedBinningProtocol,
                 extratext : Union[str, None] = None,
+                textloc : str | int | Tuple[float, float, str, str] = 'best',
                 sym : Union[bool, None] = None,
                 logc : bool = False,
                 output_folder: Union[str, None] = None,
@@ -74,14 +75,12 @@ def draw_matrix(variable : PrebinnedVariableProtocol,
         else:
             normobj = Normalize()
         
-    
     fig = setup_canvas()
     ax = make_oneax(fig)
     if dataset.isMC:
         add_cms_legend(ax, False)
     else:
         add_cms_legend(ax, True, lumi=dataset.lumi)
-
 
     if isinstance(axis, ArbitraryBinning):
         if axis.Nax == 1:
@@ -144,7 +143,6 @@ def draw_matrix(variable : PrebinnedVariableProtocol,
     else:
         yedges = np.arange(mat.shape[0] + 1) - 0.5
 
-
     artist = ax.pcolormesh(xedges, yedges, mat, cmap=cmap, norm=normobj, rasterized=True)
 
     if isinstance(axis, ArbitraryGenRecoBinning):
@@ -193,7 +191,7 @@ def draw_matrix(variable : PrebinnedVariableProtocol,
 
         cbar.set_label(cbarlabel)
 
-    add_text(ax, cut, extratext)
+    add_text(ax, cut, extratext, loc=textloc)
     
     if isinstance(axis, ArbitraryBinning):
         if axis.Nax == 1 and axis.label_lookup() is not None:

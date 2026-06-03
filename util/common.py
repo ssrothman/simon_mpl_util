@@ -321,6 +321,7 @@ def add_text(ax : matplotlib.axes.Axes,
              cut: Union[CutProtocol, List[CutProtocol]], 
              extratext: Union[str, None]=None,
              loc : str | int | Tuple[float, float, str, str]='best'):
+    
     ccut = common_cuts(cut)
     if not isinstance(cut, NoCut):
         thetext = ccut.label
