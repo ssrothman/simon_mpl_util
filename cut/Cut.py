@@ -119,7 +119,7 @@ class AllEqualCut(UnbinnedCutBase):
         
         combined = exprs[0]
         for expr in exprs[1:]:
-            combined = pc.and_(combined, expr)
+            combined = pc.and_kleene(combined, expr)
         
         return combined
 
@@ -170,7 +170,7 @@ class TwoSidedCut(UnbinnedCutBase):
         import pyarrow.compute as pc
         x = self._variable.to_pyarrow_expression()
         assert(x is not None)
-        return pc.and_(
+        return pc.and_kleene(
             pc.greater_equal(x, self._low),
             pc.less(x, self._high)
         )

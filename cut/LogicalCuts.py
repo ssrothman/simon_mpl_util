@@ -108,7 +108,7 @@ class AndCuts(UnbinnedCutBase):
         
         combined = exprs[0]
         for expr in exprs[1:]:
-            combined = pc.and_(combined, expr)
+            combined = pc.and_kleene(combined, expr)
         
         return combined
 

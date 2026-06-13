@@ -9,16 +9,17 @@ import awkward as ak
 
 import hist
 import matplotlib.axes
-
+import pyarrow.compute as pc
 
 from simonplot.util.comparison import ComparisonHistStruct
+from simonplot.util.rate import RateHistStruct, RateStruct
+from simonplot.variable.Variable import ProfileVariable, RateVariable
 from simonpy.AbitraryBinning import ArbitraryBinning
 
-from typing import List, Union, override
+from typing import Any, List, Tuple, Union, override
 
 from .DatasetBase import SingleDatasetBase, DatasetStackBase, DatasetComparisonBase
-from simonplot.typing.Protocols import BaseDatasetProtocol
-import pyarrow._compute as pc2
+from simonplot.typing.Protocols import BaseDatasetProtocol, CutProtocol, VariableProtocol
 
 class DatasetStack(DatasetStackBase):
     def __init__(self, key : str, color : str | None, label : str, datasets : list[BaseDatasetProtocol], showstack : bool = True):
@@ -153,6 +154,209 @@ class ParquetDataset(SingleDatasetBase):
     @property
     def schema(self):
         return self._dataset.schema
+
+    @override
+    def get_range(self, var : VariableProtocol, cut : CutProtocol) -> Tuple[Any, Any, Any, np.dtype]:
+        # override range to use streaming method
+
+        if hasattr(var, '_wrt'):
+            target = var._wrt
+        else:
+            target = var
+
+        varexpr = target.to_pyarrow_expression()
+        if varexpr is None:
+            raise RuntimeError("Variable %s does not have a valid pyarrow expression"%(target.key))
+
+        return self.streaming_get_range(
+            varexpr,
+            cut.to_pyarrow_expression()
+        ) # type: ignore        
+    
+    @override 
+    def get_unique(self, var : VariableProtocol, cut : CutProtocol) -> np.ndarray:
+        varexpr = var.to_pyarrow_expression()
+        if varexpr is None:
+            raise RuntimeError("Variable %s does not have a valid pyarrow expression"%(var.key))
+
+        unique_values = self.streaming_get_unique(
+            varexpr,
+            cut.to_pyarrow_expression()
+        )
+
+        return np.array(list(unique_values))
+
+    @override
+    def fill_hist(self,
+                  variable: VariableProtocol, 
+                  cut: CutProtocol, 
+                  weight : VariableProtocol,
+                  axis : Any) -> Any:
+       
+        if isinstance(variable, RateVariable):
+            Hpass = hist.Hist(
+                axis,
+                storage=hist.storage.Weight()
+            )
+            Hfail = hist.Hist(
+                axis,
+                storage=hist.storage.Weight()
+            )
+
+            wrt = variable._wrt.to_pyarrow_expression()
+            if wrt is None:
+                raise RuntimeError("Variable %s does not have a valid pyarrow expression"%(variable._wrt.key))
+
+            binaryvar = variable._binaryfield.to_pyarrow_expression()
+            if binaryvar is None:
+                raise RuntimeError("Variable %s does not have a valid pyarrow expression"%(variable._binaryfield.key))
+
+            passcut = cut.to_pyarrow_expression()
+            if passcut is None:
+                passcut = variable._binaryfield.to_pyarrow_expression()
+            else:
+                passcut = pc.and_kleene(passcut, binaryvar)
+
+            wtvar = weight.to_pyarrow_expression()
+            if wtvar is None:
+                raise RuntimeError("Variable %s does not have a valid pyarrow expression"%(weight.key))
+
+            wtvar = pc.multiply(wtvar, self._weight)
+
+            self.streaming_fill_histogram(
+                Hpass,
+                {axis.name : wrt},
+                wtvar,
+                passcut
+            )
+
+            failcut = cut.to_pyarrow_expression()
+            if failcut is None:
+                failcut = variable._binaryfield.to_pyarrow_expression()
+            else:
+                failcut = pc.and_not_kleene(failcut, binaryvar)
+
+            self.streaming_fill_histogram(
+                Hfail,
+                {axis.name : wrt},
+                wtvar,
+                failcut
+            )
+
+            self._H = RateHistStruct(Hpass, Hfail)
+
+        elif isinstance(variable, ProfileVariable):
+            raise NotImplementedError("ProfileStruct is not implemented")
+            #self._H = ProfileHistStruct(
+            #    val,
+            #    [axis]
+            #)
+        else:
+            self._H = hist.Hist(
+                axis,
+                storage=hist.storage.Weight()
+            )
+
+            valvar = variable.to_pyarrow_expression()
+            if valvar is None:
+                raise RuntimeError("Variable %s does not have a valid pyarrow expression"%(variable.key))
+            
+            wtvar = weight.to_pyarrow_expression()
+            if wtvar is None:
+                raise RuntimeError("Variable %s does not have a valid pyarrow expression"%(weight.key))
+            wtvar = pc.multiply(wtvar, self._weight)
+            
+            cutvar = cut.to_pyarrow_expression()
+
+            self.streaming_fill_histogram(
+                self._H,
+                {axis.name : valvar},
+                wtvar,
+                cutvar
+            )
+        
+        return self._H
+
+    def streaming_get_range(self, variable : ds.Expression,
+                            mask : ds.Expression | None,
+                            batch_size : int = 1 << 20,
+                            batch_readahead : int = 1,
+                            fragment_readahead : int = 1,
+                            use_threads : bool = True):
+        # Specialized method to get the range of a variable in a streaming way, without loading the entire dataset into memory.
+        # This is useful for very large datasets that cannot fit into memory.
+
+        # Create an iterator over the dataset in batches
+        columns = {'var' : variable}
+
+        iterator = self._dataset.to_batches(
+            columns = columns,
+            filter = mask,
+            batch_size = batch_size,
+            batch_readahead = batch_readahead,
+            fragment_readahead = fragment_readahead,
+            use_threads = use_threads,
+        )
+        from tqdm import tqdm
+
+        iterator = tqdm(iterator, desc='%s: range for variable %s'%(self._key, variable), unit='batch')
+        minval = None
+        minval2 = None
+        maxval = None
+        dtype = None
+        for batch in iterator:
+
+            var_array = np.asarray(batch['var'])
+            if np.sum(np.isfinite(var_array)) == 0:
+                batch_min = np.nan
+                batch_min2 = np.nan
+                batch_max = np.nan
+            else:
+                batch_min = np.nanmin(var_array)
+                batch_max = np.nanmax(var_array)
+                if np.sum(var_array > 0) > 0:
+                    batch_min2 = np.nanmin(var_array[var_array > 0])
+                else:
+                    batch_min2 = np.nan
+
+                if minval is None or batch_min < minval:
+                    minval = batch_min
+                if maxval is None or batch_max > maxval:
+                    maxval = batch_max
+                if minval2 is None or batch_min2 < minval2:
+                    minval2 = batch_min2
+                if dtype is None:
+                    dtype = var_array.dtype
+
+        return minval, minval2, maxval, dtype
+
+    def streaming_get_unique(self, variable : ds.Expression,
+                             mask : ds.Expression | None,
+                             batch_size : int = 1 << 20,
+                             batch_readahead : int = 1,
+                             fragment_readahead : int = 1,
+                             use_threads : bool = True):
+
+        # Create an iterator over the dataset in batches
+        columns = {'var' : variable}
+        iterator = self._dataset.to_batches(
+            columns = columns,
+            filter = mask,
+            batch_size = batch_size,
+            batch_readahead = batch_readahead,
+            fragment_readahead = fragment_readahead,
+            use_threads = use_threads,
+        )
+        from tqdm import tqdm
+
+        unique_values = set()
+        iterator = tqdm(iterator, desc='%s: unique vals for variable %s'%(self._key, variable), unit='batch')
+        for batch in iterator:
+            var_array = np.asarray(batch['var'])
+            unique_values.update(np.unique(var_array))
+
+        return unique_values
+
 
     def streaming_fill_histogram(self, H : hist.Hist, 
                                  variables : dict[str, ds.Expression], 

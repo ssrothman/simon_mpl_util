@@ -588,7 +588,6 @@ class DatasetStackBase(DatasetBase):
         return unique_values
 
     def get_range(self, var : VariableProtocol, cut : CutProtocol) -> Tuple[Any, Any, Any, np.dtype]:
-
         results = [d.get_range(var, cut) for d in self._datasets]
         minval = np.min([r[0] for r in results])
         minval2 = np.min([r[1] for r in results])

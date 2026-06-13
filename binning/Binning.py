@@ -80,13 +80,14 @@ class AutoBinning(BinningBase):
                         datasets: List[BaseDatasetProtocol], 
                         transform: Union[str, None]=None) -> hist.axis.AxesMixin:
 
+        print("Building auto axis for variable %s"%(variables[0].key))
         lens = []
         minvals = []
         maxvals = []
         dtypes = []
         for var, cut, dataset in zip(variables, cuts, datasets):
-            needed_columns = list(set(var.columns + cut.columns))
-            dataset.ensure_columns(needed_columns)
+            #needed_columns = list(set(var.columns + cut.columns))
+            #dataset.ensure_columns(needed_columns)
             
             minval, minval2, maxval, dtype = dataset.get_range(var, cut)
             if transform == 'log':

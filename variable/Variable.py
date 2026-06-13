@@ -762,4 +762,4 @@ class VariableFromCut(VariableBase):
         self._cut.set_collection_name(collection_name)
 
     def to_pyarrow_expression(self):
-        raise NotImplementedError("VariableFromCut does not support to_pyarrow_expression()")
+        return self._cut.to_pyarrow_expression()

@@ -310,7 +310,6 @@ def plot_histogram(variable_: Union[VariableProtocol, List[VariableProtocol]],
         pad = config['ratiopad']['auto_ylim']['padding'] + maxthreshold
         original_ylim = ax_pad.get_ylim()  # pyright: ignore[reportPossiblyUnboundVariable]
 
-        print("OVERRIDE_RATIOPAD_YLIM:", override_ratiopad_ylim)
         if override_ratiopad_ylim is not None: 
             ax_pad.set_ylim( # pyright: ignore[reportPossiblyUnboundVariable]
                 override_ratiopad_ylim[0],
