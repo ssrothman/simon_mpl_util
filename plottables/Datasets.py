@@ -160,7 +160,7 @@ class ParquetDataset(SingleDatasetBase):
         # override range to use streaming method
 
         if hasattr(var, '_wrt'):
-            target = var._wrt
+            target = var._wrt # type: ignore
         else:
             target = var
 
@@ -299,11 +299,11 @@ class ParquetDataset(SingleDatasetBase):
         )
         from tqdm import tqdm
 
-        iterator = tqdm(iterator, desc='%s: range for variable %s'%(self._key, variable), unit='batch')
-        minval = None
-        minval2 = None
-        maxval = None
-        dtype = None
+        iterator = tqdm(iterator, desc='%s: range'%(self._key), unit='batch')
+        minval = np.nan
+        minval2 = np.nan
+        maxval = np.nan
+        dtype = np.float32
         for batch in iterator:
 
             var_array = np.asarray(batch['var'])
@@ -319,14 +319,14 @@ class ParquetDataset(SingleDatasetBase):
                 else:
                     batch_min2 = np.nan
 
-                if minval is None or batch_min < minval:
+                if np.isnan(minval) or batch_min < minval:
                     minval = batch_min
-                if maxval is None or batch_max > maxval:
+                if np.isnan(maxval) or batch_max > maxval:
                     maxval = batch_max
-                if minval2 is None or batch_min2 < minval2:
+                if np.isnan(minval2) or batch_min2 < minval2:
                     minval2 = batch_min2
-                if dtype is None:
-                    dtype = var_array.dtype
+                
+                dtype = var_array.dtype
 
         return minval, minval2, maxval, dtype
 
@@ -350,7 +350,7 @@ class ParquetDataset(SingleDatasetBase):
         from tqdm import tqdm
 
         unique_values = set()
-        iterator = tqdm(iterator, desc='%s: unique vals for variable %s'%(self._key, variable), unit='batch')
+        iterator = tqdm(iterator, desc='%s: unique vals'%(self._key), unit='batch')
         for batch in iterator:
             var_array = np.asarray(batch['var'])
             unique_values.update(np.unique(var_array))
@@ -384,7 +384,7 @@ class ParquetDataset(SingleDatasetBase):
             use_threads = use_threads,
         )
         from tqdm import tqdm
-        iterator = tqdm(iterator, desc='Filling histogram', unit='batch')
+        iterator = tqdm(iterator, desc='%s: Filling histogram'%self._key, unit='batch')
         for batch in iterator:
             # Evaluate the variables and weights for the current batch
             H.fill(**{name : value for name, value in zip(batch.column_names, batch.columns)})

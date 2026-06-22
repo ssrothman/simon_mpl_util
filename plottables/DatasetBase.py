@@ -589,10 +589,10 @@ class DatasetStackBase(DatasetBase):
 
     def get_range(self, var : VariableProtocol, cut : CutProtocol) -> Tuple[Any, Any, Any, np.dtype]:
         results = [d.get_range(var, cut) for d in self._datasets]
-        minval = np.min([r[0] for r in results])
-        minval2 = np.min([r[1] for r in results])
-        maxval = np.max([r[2] for r in results])
-        return (minval, minval2, maxval, results[0][0].dtype)
+        minval = np.nanmin([r[0] for r in results])
+        minval2 = np.nanmin([r[1] for r in results])
+        maxval = np.nanmax([r[2] for r in results])
+        return (minval, minval2, maxval, np.asarray(results[0][0]).dtype)
 
     @property
     def binning(self) -> ArbitraryBinning:

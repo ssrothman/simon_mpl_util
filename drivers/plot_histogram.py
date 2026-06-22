@@ -287,6 +287,7 @@ def plot_histogram(variable_: Union[VariableProtocol, List[VariableProtocol]],
             )
 
             basemask = np.isfinite(ratiovals)
+            ratioerrs[np.isnan(ratioerrs)] = 0.0
             ratiothreshold = np.nanpercentile(ratioerrs[basemask], config['ratiopad']['auto_ylim']['percentile']) 
             ratiothreshold = max(ratiothreshold, config['ratiopad']['auto_ylim']['min_threshold'])
 
