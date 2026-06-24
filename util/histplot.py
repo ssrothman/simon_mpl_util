@@ -125,7 +125,7 @@ def simon_histplot(H, ax=None, density=False, fillbetween = None, **kwargs):
 
     dont_divide_by_width = isinstance(H, (RateHistStruct, ProfileHistStruct)) 
     dont_divide_by_width |= isinstance(H, ComparisonHistStruct) and H.mode == 'ratio'
-
+    print("dont divide by width?", dont_divide_by_width)
     return _simon_histplot(vals, errs, edges, centers, widths,
                            ax=ax, density=density, fillbetween=fillbetween,
                            dont_divide_by_width = dont_divide_by_width,

@@ -3,6 +3,7 @@ from simonplot.plottables.DatasetBase import DatasetComparisonBase
 from simonplot.plottables.Datasets import DatasetComparison
 from simonplot.plottables.Functions import FuncBase
 from simonplot.plottables.PlotStuff import AbstractPlotSpec
+from simonplot.util.comparison import ComparisonHistStruct
 from simonplot.util.profile import ProfileHistStruct
 from simonplot.util.rate import RateHistStruct
 from simonplot.typing.Protocols import HistplotMode, PrebinnedVariableProtocol
@@ -416,7 +417,7 @@ def plot_histogram(variable_: Union[VariableProtocol, List[VariableProtocol]],
             logy = False
 
         else:
-            if isinstance(Hs[0], (hist.Hist, RateHistStruct, ProfileHistStruct)):
+            if isinstance(Hs[0], (hist.Hist, RateHistStruct, ProfileHistStruct, ComparisonHistStruct)):
                 Hvals = np.concatenate([H.values(flow=True) for H in Hs])
             else:
                 Hvals = np.concatenate([H[0] for H in Hs])
@@ -445,7 +446,7 @@ def plot_histogram(variable_: Union[VariableProtocol, List[VariableProtocol]],
 
         ylim = ax_main.get_ylim()
 
-        if isinstance(Hs[0], hist.Hist) or isinstance(Hs[0], RateHistStruct) or isinstance(Hs[0], ProfileHistStruct):
+        if isinstance(Hs[0], hist.Hist) or isinstance(Hs[0], RateHistStruct) or isinstance(Hs[0], ProfileHistStruct) or isinstance(Hs[0], ComparisonHistStruct):
             Hvals = [H.values(flow=True) for H in Hs]
         else:
             Hvals = [H[0] for H in Hs]

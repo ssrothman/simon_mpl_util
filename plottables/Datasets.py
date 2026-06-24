@@ -1,5 +1,3 @@
-from coffea.nanoevents import NanoEventsFactory, NanoAODSchema
-
 import pyarrow.parquet as pq
 import pyarrow as pa
 import pyarrow.dataset as ds
@@ -65,7 +63,10 @@ class DatasetComparison(DatasetComparisonBase):
         return self._ylabel
     
 class NanoEventsDataset(SingleDatasetBase):
+
     def __init__(self, key : str, color : str | None, label : str, fname, **options):
+        from coffea.nanoevents import NanoEventsFactory, NanoAODSchema
+
         self._key = key
         self._color = color
         self._label = label
@@ -221,8 +222,6 @@ class ParquetDataset(SingleDatasetBase):
             if wtvar is None:
                 raise RuntimeError("Variable %s does not have a valid pyarrow expression"%(weight.key))
 
-            wtvar = pc.multiply(wtvar, self._weight)
-
             self.streaming_fill_histogram(
                 Hpass,
                 {axis.name : wrt},
@@ -264,9 +263,15 @@ class ParquetDataset(SingleDatasetBase):
             wtvar = weight.to_pyarrow_expression()
             if wtvar is None:
                 raise RuntimeError("Variable %s does not have a valid pyarrow expression"%(weight.key))
-            wtvar = pc.multiply(wtvar, self._weight)
             
             cutvar = cut.to_pyarrow_expression()
+
+            print("filling hist")
+            print("\tstarting", self._H.sum())
+            print("\twtvar", wtvar)
+            print("\tcutvar", cutvar)
+            print("\tvalvar", valvar)
+            print()
 
             self.streaming_fill_histogram(
                 self._H,
@@ -374,6 +379,8 @@ class ParquetDataset(SingleDatasetBase):
         if weight is not None:
             import pyarrow.compute as pc
             columns['weight'] = pc.multiply(weight, self._weight)
+        else:
+            columns['weight'] = pc.scalar(self._weight)
             
         iterator = self._dataset.to_batches(
             columns = columns,
