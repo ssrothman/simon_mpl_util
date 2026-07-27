@@ -29,6 +29,12 @@ def call_histplot_function(H : Any,
                            ax : matplotlib.axes.Axes,
                            density : bool,
                            fillbetween : Any,
+                           dont_divide_by_width : bool,
+                           jitter_i : int | None = None,
+                           jitter_N : int | None = None,
+                           jitter_log : bool | None = None,
+                           marker : str | None = None,
+                           gray_boxes : bool = False,
                            **mpl_kwargs) -> Tuple[Any, Any]:
 
     if isinstance(H, hist.Hist) or isinstance(H, RateHistStruct) or isinstance(H, ProfileHistStruct) or isinstance(H, ComparisonHistStruct):
@@ -37,6 +43,12 @@ def call_histplot_function(H : Any,
             ax = ax,
             density=density,
             fillbetween = fillbetween,
+            dont_divide_by_width = dont_divide_by_width,
+            jitter_i = jitter_i,
+            jitter_N = jitter_N,
+            jitter_log = jitter_log,
+            marker = marker,
+            gray_boxes = gray_boxes,
             **mpl_kwargs
         )
     elif isinstance(H, tuple):
@@ -48,6 +60,12 @@ def call_histplot_function(H : Any,
             ax = ax,
             density=density,
             fillbetween = fillbetween,
+            dont_divide_by_width = dont_divide_by_width,
+            jitter_i = jitter_i,
+            jitter_N = jitter_N,
+            jitter_log = jitter_log,
+            marker = marker,
+            gray_boxes = gray_boxes,
             **mpl_kwargs
         )
     else:
@@ -389,7 +407,12 @@ class SingleDatasetBase(DatasetBase):
                 ax : matplotlib.axes.Axes,
                 own_style : bool,
                 mode : HistplotMode,
+                dont_divide_by_width : bool = False,
                 _fillbetween : Union[float, None] = None,
+                jitter_i : int | None = None,
+                jitter_N : int | None = None,
+                jitter_log : bool | None = None,
+                marker : str | None = None,
                 **mpl_kwargs) -> Tuple[Tuple[Any, Any], Any]:
 
         self.fill_hist(variable, cut, weight, axis)
@@ -400,7 +423,7 @@ class SingleDatasetBase(DatasetBase):
 
         if _fillbetween is not None:
             fbtw = _fillbetween
-        elif mode != HistplotMode.ERRORBAR:
+        elif mode == HistplotMode.FILL or mode == HistplotMode.STACK:
             fbtw = 0
         else:
             fbtw = None
@@ -411,6 +434,12 @@ class SingleDatasetBase(DatasetBase):
             ax = ax,
             density=density,
             fillbetween = fbtw,
+            dont_divide_by_width = dont_divide_by_width,
+            jitter_i = jitter_i,
+            jitter_N = jitter_N,
+            jitter_log = jitter_log,
+            marker = marker,
+            gray_boxes = mode == HistplotMode.GRAY_BOXES,
             **mpl_kwargs
         )
         return (artist, vals), self._H
@@ -539,7 +568,12 @@ class DatasetComparisonBase(DatasetBase):
             ax : matplotlib.axes.Axes,
             own_style : bool,
             mode : HistplotMode,
+            dont_divide_by_width : bool = False,
             _fillbetween : Union[float, None] = None,
+            jitter_i : int | None = None,
+            jitter_N : int | None = None,
+            jitter_log : bool | None = None,
+            marker : str | None = None,
             **mpl_kwargs) -> Tuple[Tuple[Any, Any], Any]:
 
         self.fill_hist(variable, cut, weight, axis)
@@ -559,6 +593,12 @@ class DatasetComparisonBase(DatasetBase):
             ax = ax,
             density=False,
             fillbetween = None,
+            dont_divide_by_width = dont_divide_by_width,
+            jitter_i = jitter_i,
+            jitter_N = jitter_N,
+            jitter_log = jitter_log,
+            marker = marker,
+            gray_boxes = mode == HistplotMode.GRAY_BOXES,
             **mpl_kwargs
         )
         return (artist, vals), self._H
@@ -723,7 +763,12 @@ class DatasetStackBase(DatasetBase):
                 ax : matplotlib.axes.Axes,
                 own_style : bool,
                 mode : HistplotMode,
+                dont_divide_by_width : bool = False,
                 _fillbetween : Union[float, None] = None,
+                jitter_i : int | None = None,
+                jitter_N : int | None = None,
+                jitter_log : bool | None = None,
+                marker : str | None = None,
                 **mpl_kwargs) -> Tuple[Any, Tuple[Any, Any]]:
         
         if len(self._datasets) == 0:
@@ -733,12 +778,12 @@ class DatasetStackBase(DatasetBase):
 
         if _fillbetween is not None:
             fbtw = _fillbetween
-        elif mode != HistplotMode.ERRORBAR:
+        elif mode == HistplotMode.FILL or mode == HistplotMode.STACK:
             fbtw = 0
         else:
             fbtw = None
 
-        if mode != HistplotMode.ERRORBAR and not own_style:
+        if (mode == HistplotMode.STACK or mode == HistplotMode.FILL) and not own_style:
             raise ValueError("fillbetween is only supported when own_style is True")
 
         if own_style and mode != HistplotMode.STACK:
@@ -756,6 +801,11 @@ class DatasetStackBase(DatasetBase):
                     own_style=True,
                     _fillbetween = prev,
                     mode = HistplotMode.FILL,
+                    dont_divide_by_width = dont_divide_by_width,
+                    jitter_i = jitter_i,
+                    jitter_N = jitter_N,
+                    jitter_log = jitter_log,
+                    marker = marker,
                     **mpl_kwargs
                 )
                 prev = vals
@@ -768,6 +818,12 @@ class DatasetStackBase(DatasetBase):
                 ax = ax,
                 density=density,
                 fillbetween = fbtw,
+                dont_divide_by_width = dont_divide_by_width,
+                jitter_i = jitter_i,
+                jitter_N = jitter_N,
+                jitter_log = jitter_log,
+                marker = marker,
+                gray_boxes = mode == HistplotMode.GRAY_BOXES,
                 **mpl_kwargs
             )   
             return (artist, vals), self.H

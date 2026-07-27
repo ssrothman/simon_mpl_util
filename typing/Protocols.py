@@ -157,6 +157,7 @@ class HistplotMode(IntEnum):
     ERRORBAR = 0
     FILL = 1
     STACK = 2
+    GRAY_BOXES = 3
 
 @runtime_checkable
 class BaseDatasetProtocol(Protocol):
@@ -248,6 +249,11 @@ class BaseDatasetProtocol(Protocol):
                        own_style : bool,
                        mode : HistplotMode,
                        _fillbetween : Union[float, None] = None,
+                       dont_divide_by_width : bool = False,
+                       jitter_i : int | None = None,
+                       jitter_N : int | None = None,
+                       jitter_log : bool | None = None,
+                       marker : str | None = None,
                        **mpl_kwargs) -> Tuple[Tuple[Any, Any], Any]:
         ...
 

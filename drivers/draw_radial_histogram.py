@@ -11,7 +11,7 @@ from simonpy.text import strip_units, strip_dollar_signs, find_match
 import os
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.colors import Normalize, LogNorm, SymLogNorm
+from matplotlib.colors import Colormap, Normalize, LogNorm, SymLogNorm, rgb_to_hsv, hsv_to_rgb
 
 from typing import List, Union, assert_never
 from enum import IntEnum
@@ -32,6 +32,22 @@ def _pcolormesh(ax, edges, angular_name, radial_name, hist2d, cmap, norm):
     )
 
 
+class dimmed_cmap(Colormap):
+    def __init__(self, cmap):
+        self._cmap = plt.get_cmap(cmap)
+        super().__init__(name='dimmed_cmap', N=self._cmap.N)
+    
+    def __call__(self, value, alpha=None, bytes=False):
+        rgba = self._cmap(value, alpha=alpha, bytes=bytes)
+        if bytes:
+            raise ValueError("dimmed_cmap does not support bytes output")
+        else:
+            hsv = rgb_to_hsv(rgba[..., :3])
+            hsv[..., 2] *= 0.6
+            hsv[..., 1] *= 0.7
+            rgba[..., :3] = hsv_to_rgb(hsv)
+        return rgba
+    
 def draw_radial_histogram(
                    variable : PrebinnedVariableProtocol,
                    cut: PrebinnedOperationProtocol, 
@@ -41,6 +57,7 @@ def draw_radial_histogram(
                    logc : bool | None = None,
                    sym : bool | None = None,
                    override_cbarlabel : Union[str, None] = None,
+                   override_cbarrange : tuple[float, float] | None = None,
                    output_folder: Union[str, None] = None,
                    output_prefix: Union[str, None] = None,
                    override_filename: Union[str, None] = None):
@@ -123,25 +140,40 @@ def draw_radial_histogram(
 
     if sym:
         cmap = 'coolwarm'
-        diff = hist2d - variable.centerline
+        if type(variable.centerline) is float:
+            centerline = variable.centerline
+        else:
+            raise ValueError("Variable centerline must be a float if sym is True, but got %s" % type(variable.centerline))
+
+        diff = hist2d - centerline
         maxabs = np.max(np.abs(diff))
+        if override_cbarrange is not None:
+
+            maxabs = max(abs(override_cbarrange[0] - centerline), abs(override_cbarrange[1] - centerline))
+
         if logc:
             norm = SymLogNorm(
                 linthresh=maxabs/1e3, 
-                vmin=variable.centerline-maxabs, 
-                vmax=variable.centerline+maxabs
+                vmin=centerline-maxabs, 
+                vmax=centerline+maxabs
             )
         else:
             norm = Normalize(
-                vmin=variable.centerline-maxabs,
-                vmax=variable.centerline+maxabs
+                vmin=centerline-maxabs,
+                vmax=centerline+maxabs
             )
     else:
         cmap = 'plasma'
         if logc:
-            norm = LogNorm()
+            if override_cbarrange is not None:
+                norm = LogNorm(vmin=override_cbarrange[0], vmax=override_cbarrange[1])
+            else:
+                norm = LogNorm()
         else:
-            norm = Normalize()
+            if override_cbarrange is not None:
+                norm = Normalize(vmin=override_cbarrange[0], vmax=override_cbarrange[1])
+            else:
+                norm = Normalize()
 
     artist = _pcolormesh(
         ax, edges, angular_name, radial_name, hist2d, cmap, norm
@@ -153,23 +185,23 @@ def draw_radial_histogram(
         edges2 = edges.copy()
         edges2[angular_name] = -edges[angular_name]
         _pcolormesh(
-            ax, edges2, angular_name, radial_name, hist2d, cmap, norm
+            ax, edges2, angular_name, radial_name, hist2d, dimmed_cmap(cmap), norm
         )
     elif range_type == _RANGES.QUARTER:
         edges2 = edges.copy()
         edges2[angular_name] = np.pi - edges[angular_name]
         _pcolormesh(
-            ax, edges2, angular_name, radial_name, hist2d, cmap, norm
+            ax, edges2, angular_name, radial_name, hist2d, dimmed_cmap(cmap), norm
         )
         edges3 = edges.copy()
         edges3[angular_name] = -edges[angular_name]
         _pcolormesh(
-            ax, edges3, angular_name, radial_name, hist2d, cmap, norm
+            ax, edges3, angular_name, radial_name, hist2d, dimmed_cmap(cmap), norm
         )
         edges4 = edges.copy()
         edges4[angular_name] = np.pi + edges[angular_name]
         _pcolormesh(
-            ax, edges4, angular_name, radial_name, hist2d, cmap, norm
+            ax, edges4, angular_name, radial_name, hist2d, dimmed_cmap(cmap), norm
         )
     else:
         assert_never(range_type)

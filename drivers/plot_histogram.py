@@ -1,3 +1,5 @@
+from matplotlib.transforms import Transform
+
 from simonplot.config.lookuputil import lookup_axis_label
 from simonplot.plottables.DatasetBase import DatasetComparisonBase
 from simonplot.plottables.Datasets import DatasetComparison
@@ -18,6 +20,7 @@ from simonplot.variable.Variable import ProfileVariable, RateVariable
 from simonpy.AbitraryBinning import ArbitraryBinning, ArbitraryGenRecoBinning
 from simonpy.sanitization import ensure_same_length, all_same_key
 from simonpy.text import clean_string, strip_units, strip_dollar_signs
+from matplotlib import scale as mscale
 
 import os
 import matplotlib.pyplot as plt
@@ -26,6 +29,8 @@ import hist
 
 from typing import Any, List, Sequence, Tuple, Union
 
+markers = ['v', '^', '<', '>', 's', 'P', '*', 'X', 'd']
+    
 def plot_histogram(variable_: Union[VariableProtocol, List[VariableProtocol]], 
                    cut_: Union[CutProtocol, List[CutProtocol]], 
                    weight_ : Union[VariableProtocol, List[VariableProtocol]],
@@ -40,12 +45,27 @@ def plot_histogram(variable_: Union[VariableProtocol, List[VariableProtocol]],
                    pulls : bool = False,
                    no_ratiopad : bool = False,
                    no_lumi_normalization : bool = False,
+                   dont_divide_by_width : bool = False,
                    output_folder: Union[str, None] = None,
                    output_prefix: Union[str, None] = None,
                    override_filename: Union[str, None] = None,
                    override_ylabel : Union[str, None] = None,
                    override_ratiopad_ylim : Tuple[float, float] | None = None,
-                   extra_stuff : List[Any] = []):
+                   report_mean : bool = False,
+                   xjitter : bool = False,
+                   different_markers : bool = True,
+                   plot_as_gray_boxes : int | None = None,
+                   override_ylim : Tuple[float, float] | None = None,
+                   override_colors : List[str] | None = None,
+                   extra_stuff : List[Any] = [],
+                   force_no_legend : bool = False,
+                   no_text_frame : bool = True,
+                   
+                   # pass pre-existing figure, axis objects
+                   existing_fig : Any = None,
+                   existing_ax : Any = None,
+                   setup_existing_ax : bool = False,
+                   save_existing_fig : bool = False):
 
     if labels_ is None or len(labels_) == 1:
         nolegend = True
@@ -153,6 +173,9 @@ def plot_histogram(variable_: Union[VariableProtocol, List[VariableProtocol]],
         weight = [weight[resolve_stack]] + [weight[i] for i in range(len(weight)) if i != resolve_stack]
         dataset = [dataset[resolve_stack]] + [dataset[i] for i in range(len(dataset)) if i != resolve_stack]
         labels = [labels[resolve_stack]] + [labels[i] for i in range(len(labels)) if i != resolve_stack]
+        if override_colors is not None:
+            override_colors = [override_colors[resolve_stack]] + [override_colors[i] for i in range(len(override_colors)) if i != resolve_stack]
+
         resolve_stack = 0
 
     '''
@@ -176,6 +199,8 @@ def plot_histogram(variable_: Union[VariableProtocol, List[VariableProtocol]],
             weight = [weight[fill_dataset]] + [weight[i] for i in range(len(weight)) if i != fill_dataset]
             dataset = [dataset[fill_dataset]] + [dataset[i] for i in range(len(dataset)) if i != fill_dataset]
             labels = [labels[fill_dataset]] + [labels[i] for i in range(len(labels)) if i != fill_dataset]
+            if override_colors is not None:
+                override_colors = [override_colors[fill_dataset]] + [override_colors[i] for i in range(len(override_colors)) if i != fill_dataset]
 
             fill_dataset = 0
 
@@ -203,6 +228,8 @@ def plot_histogram(variable_: Union[VariableProtocol, List[VariableProtocol]],
             weight = [weight[i] for i in range(len(weight)) if i != which_data] + [weight[which_data]]
             dataset = [dataset[i] for i in range(len(dataset)) if i != which_data] + [dataset[which_data]]
             labels = [labels[i] for i in range(len(labels)) if i != which_data] + [labels[which_data]]
+            if override_colors is not None:
+                override_colors = [override_colors[i] for i in range(len(override_colors)) if i != which_data] + [override_colors[which_data]]
 
         which_data = len(variable) - 1
         which_ref = which_data
@@ -225,17 +252,28 @@ def plot_histogram(variable_: Union[VariableProtocol, List[VariableProtocol]],
             else:
                 dataset[i]._weight = 1.0 # type: ignore
 
-    fig = setup_canvas()
+    if existing_ax is None:
+        fig = setup_canvas()
 
-    if do_ratiopad:
-        ax_main, ax_pad = make_axes_withpad(fig)
-    else:
-        ax_main = make_oneax(fig)
+        if do_ratiopad:
+            ax_main, ax_pad = make_axes_withpad(fig)
+        else:
+            ax_main = make_oneax(fig)
 
-    if isdata:
-        add_cms_legend(ax_main, True, lumi=dataset[which_data].lumi) # pyright: ignore[reportCallIssue, reportArgumentType]
+        if isdata:
+            add_cms_legend(ax_main, True, lumi=dataset[which_data].lumi) # pyright: ignore[reportCallIssue, reportArgumentType]
+        else:
+            add_cms_legend(ax_main, False)
     else:
-        add_cms_legend(ax_main, False)
+        fig = existing_fig
+        ax_main = existing_ax
+        do_ratiopad = False
+
+        if setup_existing_ax:
+            if isdata:
+                add_cms_legend(ax_main, True, lumi=dataset[which_data].lumi) # pyright: ignore[reportCallIssue, reportArgumentType]
+            else:
+                add_cms_legend(ax_main, False)
 
     artists = []
     Hs = []
@@ -243,15 +281,35 @@ def plot_histogram(variable_: Union[VariableProtocol, List[VariableProtocol]],
         if style_from_dset and d.label is not None:
             nolegend = False #force legend if dataset has label
 
+        if plot_as_gray_boxes is not None and i == plot_as_gray_boxes:
+            mode = HistplotMode.GRAY_BOXES
+        elif d.is_stack and resolve_stack == i:
+            mode = HistplotMode.STACK
+        else:
+            mode = HistplotMode.ERRORBAR
+
+        extra_kwargs = {}
+        if override_colors is not None:
+            extra_kwargs['color'] = override_colors[i]
+
         artist, H = d.plot_hist(
             v, c, w, axis[i], 
             density, ax_main, 
             style_from_dset,
             label=l,
-            mode = HistplotMode.STACK if (d.is_stack and resolve_stack == i) else HistplotMode.ERRORBAR,
+            mode = mode,
+            dont_divide_by_width = dont_divide_by_width,
+            jitter_i = i if xjitter else None,
+            jitter_N = len(variable) if xjitter else None,
+            jitter_log = logx if xjitter else None,
+            marker = markers[i] if different_markers else None,
+            **extra_kwargs
         )
         artists.append(artist)
         Hs.append(H)
+
+    if force_no_legend:
+        nolegend = True
 
     for extra in extra_stuff:
         if isinstance(extra, FuncBase):
@@ -385,7 +443,7 @@ def plot_histogram(variable_: Union[VariableProtocol, List[VariableProtocol]],
     if override_ylabel is not None:
         ylabel = override_ylabel
     else:
-        if isinstance(axis[0], ArbitraryBinning) and axis[0].Nax > 1:
+        if isinstance(axis[0], ArbitraryBinning):
             if not isinstance(variable[0], PrebinnedVariableProtocol):
                 raise RuntimeError("Prebinned Binning requires PrebinnedVariable!")
             
@@ -437,6 +495,7 @@ def plot_histogram(variable_: Union[VariableProtocol, List[VariableProtocol]],
 
     if logx:
         ax_main.set_xscale('log')
+
     if logy:
         ax_main.set_yscale('log')
 
@@ -528,7 +587,7 @@ def plot_histogram(variable_: Union[VariableProtocol, List[VariableProtocol]],
             ax_main.set_xticks(axis[0].edges) # pyright: ignore[reportArgumentType, reportAttributeAccessIssue]
             ax_main.set_xticks(axis[0].centers, minor=True) # pyright: ignore[reportAttributeAccessIssue]
             ax_main.set_xticklabels(ticklabels_strs, 
-                            rotation=0, ha='center',
+                            rotation=30, ha='center',
                             #fontsize=14,
                             minor=True)
             #hide major tick labels
@@ -566,51 +625,65 @@ def plot_histogram(variable_: Union[VariableProtocol, List[VariableProtocol]],
 
     draw_legend(ax_main, nolegend)
 
-    add_text(ax_main, cut, extratext, loc=textloc)
+    add_text(ax_main, cut, extratext, loc=textloc, noframe = no_text_frame)
 
-    fig.tight_layout()
+    if override_ylim is not None:
+        ax_main.set_ylim(override_ylim)
 
-    if output_folder is not None:
-        if override_filename is not None:
-            output_path = os.path.join(output_folder, override_filename)
+    if (existing_fig is not None and save_existing_fig) or existing_fig is None:
+        fig.tight_layout()
+
+        if output_folder is not None:
+            if override_filename is not None:
+                output_path = os.path.join(output_folder, override_filename)
+            else:
+                if output_prefix is None:
+                    output_path = os.path.join(output_folder, 'hist')
+                else:
+                    output_path = os.path.join(output_folder, output_prefix)
+
+                if all_same_key(variable):
+                    output_path += '_VAR-%s' % variable[0].key 
+                
+                if all_same_key(cut):
+                    output_path += '_CUT-%s' % cut[0].key
+
+                if all_same_key(weight, skip=which_data):
+                    output_path += '_WGT-%s' % weight[0].key
+
+                if all_same_key(dataset):
+                    output_path += '_DSET-%s' % dataset[0].key
+                elif all_same_key(dataset, skip=which_data):
+                    output_path += '_DSET-DATAvs%s' % dataset[0].key
+                else:
+                    output_path += '_DSET-%s' % ('vs'.join([d.key for d in dataset]))
+                if logx:
+                    output_path += '_LOGX'
+                if logy:
+                    output_path += '_LOGY'
+                if density:
+                    output_path += '_DENSITY'
+                if no_ratiopad:
+                    output_path += '_NORATIO'
+
+            if pulls and do_ratiopad:
+                output_path += '_PULLS'
+
+            savefig(fig, output_path)
         else:
-            if output_prefix is None:
-                output_path = os.path.join(output_folder, 'hist')
-            else:
-                output_path = os.path.join(output_folder, output_prefix)
+            plt.show()
 
-            if all_same_key(variable):
-                output_path += '_VAR-%s' % variable[0].key 
-            
-            if all_same_key(cut):
-                output_path += '_CUT-%s' % cut[0].key
-
-            if all_same_key(weight, skip=which_data):
-                output_path += '_WGT-%s' % weight[0].key
-
-            if all_same_key(dataset):
-                output_path += '_DSET-%s' % dataset[0].key
-            elif all_same_key(dataset, skip=which_data):
-                output_path += '_DSET-DATAvs%s' % dataset[0].key
-            else:
-                output_path += '_DSET-%s' % ('vs'.join([d.key for d in dataset]))
-            if logx:
-                output_path += '_LOGX'
-            if logy:
-                output_path += '_LOGY'
-            if density:
-                output_path += '_DENSITY'
-            if no_ratiopad:
-                output_path += '_NORATIO'
-
-        if pulls and do_ratiopad:
-            output_path += '_PULLS'
-
-        savefig(fig, output_path)
-    else:
-        plt.show()
+        plt.close(fig)
         
     if isinstance(cut[0], PrebinnedOperationProtocol):
         cut[0].clear_resulting_binning_cache()
 
-    plt.close(fig)
+    if report_mean:
+        print("MEAN VALUES for variable %s:" % variable[0].key)
+        for i, H in enumerate(Hs):
+            if isinstance(H[0], (hist.Hist, RateHistStruct, ProfileHistStruct, ComparisonHistStruct)):
+                mean = np.nanmean(H.values(flow=False))
+            else:
+                mean = np.nanmean(H[0])
+            print("  Dataset %s: mean = %s" % (dataset[i].key, mean))
+

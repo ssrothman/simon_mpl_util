@@ -30,6 +30,19 @@ def setup_canvas() -> matplotlib.figure.Figure:
 
     return fig
 
+def make_manyax(fig: matplotlib.figure.Figure, nrows: int, ncols: int,
+                sharex : bool = False, sharey : bool = False,
+                wspace : float | None = None, hspace : float | None = None):
+    
+    gridspec_kw = {}
+    if wspace is not None:
+        gridspec_kw['wspace'] = wspace
+    if hspace is not None:
+        gridspec_kw['hspace'] = hspace
+
+    axes = fig.subplots(nrows, ncols, squeeze=False, gridspec_kw=gridspec_kw)
+    return axes
+
 def make_oneax(fig: matplotlib.figure.Figure) -> matplotlib.axes.Axes:
     ax = fig.add_subplot(1,1,1)
     return ax
@@ -53,7 +66,7 @@ def add_cms_legend(ax, isdata: bool, lumi: Union[float, None]=None):
     
     if isdata:
         hep.cms.label(ax=ax, data=True, 
-                      lumi='%0.2f'%lumi,
+                      lumi='%0.1f'%lumi,
                       year= config.get('year', None),
                       com = config.get('com', None),
                       label=config['cms_label'])
@@ -284,21 +297,21 @@ def draw_legend(ax: matplotlib.axes.Axes, nolegend: bool, scale: float=1.0, loc:
     if not nolegend:
         if type(loc) in [int, str]:
             ldg = ax.legend(
-                fontsize=18, 
+                fontsize=24, 
                 loc=loc,
                 framealpha=0.8,
                 borderpad=0.3,
-                frameon=True,
+                frameon=False,
                 markerscale=scale
             )
         elif type(loc) is tuple:
             ldg = ax.legend(
-                fontsize=18, 
+                fontsize=24, 
                 bbox_to_anchor=loc[:2],
                 loc=loc[2],
                 framealpha=0.8,
                 borderpad=0.3,
-                frameon=True,
+                frameon=False,
                 markerscale=scale
             )
         else:
@@ -320,7 +333,8 @@ def draw_legend(ax: matplotlib.axes.Axes, nolegend: bool, scale: float=1.0, loc:
 def add_text(ax : matplotlib.axes.Axes, 
              cut: Union[CutProtocol, List[CutProtocol]], 
              extratext: Union[str, None]=None,
-             loc : str | int | Tuple[float, float, str, str]='best'):
+             loc : str | int | Tuple[float, float, str, str]='best',
+             noframe : bool = False):
     
     ccut = common_cuts(cut)
     if not isinstance(cut, NoCut):
@@ -334,12 +348,19 @@ def add_text(ax : matplotlib.axes.Axes,
     thetext = thetext.strip()
 
     if thetext != '':
-        place_text(ax, thetext, loc=loc, fontsize=24, bbox_opts={
-            'boxstyle': 'round,pad=0.3',
-            'facecolor': 'white',
-            'edgecolor': 'black',
-            'alpha': 0.8
-        })
+        if noframe:
+            bbox_opts = {
+                'visible' : False
+            }
+        else:
+            bbox_opts = {
+                'boxstyle': 'round,pad=0.3',
+                'facecolor': 'white',
+                'edgecolor': 'black',
+                'linewidth': 1.0,
+                'alpha': 0.8
+            }
+        place_text(ax, thetext, loc=loc, fontsize=24, bbox_opts=bbox_opts)
     return thetext
 
 def get_artist_color(artist : Union[matplotlib.container.ErrorbarContainer, matplotlib.patches.Patch, matplotlib.lines.Line2D]):
@@ -354,45 +375,59 @@ def label_from_binning(binning : ArbitraryBinning) -> str:
     if binning.Nax == 1:
         return lookup_axis_label(binning.axis_names[0])
     else:
-        return '@'.join([strip_units(lookup_axis_label(ax)) for ax in binning.axis_names]) + " bin index"
+        return ' $\\times$ '.join([strip_units(lookup_axis_label(ax)) for ax in binning.axis_names]) + " bin index"
     
 
 def prebinned_ylabel(var : PrebinnedVariableProtocol, binning : ArbitraryBinning) -> str:
+    print("prebinned_ylabel()")
     if var.normalized_by_err:
         ylabel = '$\\frac{N}{\\sigma_N}$'
     elif var.hasjacobian:
+        print("has jacobian")
+        print('jac details', var.jac_details)
         denom = ''
         axes = var.jac_details['wrt']
         if len(axes) == 0:
             axes = binning.axis_names
         for ax in axes:
-            l = clean_string(lookup_axis_label(ax))
+            if ax.startswith('OneMinus'):
+                l = clean_string(lookup_axis_label(ax[len('OneMinus_'):]))
+            else:
+                l = clean_string(lookup_axis_label(ax))
+
             if ax in var.jac_details['radial_coords']:
                 denom += l + ' d(' + l + ')'
             else:
                 denom += ' d(' + l + ')'
         ylabel = '$\\frac{dN}{%s}$' % denom.strip()
+    elif binning.Nax == 1:
+        print("single axis")
+        ylabel = '$\\frac{dN}{d(%s)}$' % (clean_string(lookup_axis_label(binning.axis_names[0])))
     else:
+        print("bin counts")
         ylabel = 'Bin counts'
 
-    if var.normalized_blocks:
+    if "NormalizePerBlock" in var.key:
         normvars = var.normalized_blocks
 
-        normvars_for_extra = []
-        for normvar in normvars:
-            if normvar not in var.jac_details['wrt']:
-                normvars_for_extra.append(normvar)
-            else:
-                l = clean_string(lookup_axis_label(normvar))
-                ylabel = ylabel.replace(l + 'd(%s)' % l, '')
-                ylabel = ylabel.replace('d(%s)'%l, '')
+        if len(normvars) == 0:
+            ylabel += '(normalized)'
+        else:
+            normvars_for_extra = []
+            for normvar in normvars:
+                if normvar not in var.jac_details['wrt']:
+                    normvars_for_extra.append(normvar)
+                else:
+                    l = clean_string(lookup_axis_label(normvar))
+                    ylabel = ylabel.replace(l + 'd(%s)' % l, '')
+                    ylabel = ylabel.replace('d(%s)'%l, '')
 
-        if normvars_for_extra:
-            if len(normvars_for_extra) == 1:
-                binsid = strip_units(lookup_axis_label(normvars_for_extra[0]))
-            else:
-                binsid = '(%s)' % ', '.join([strip_units(lookup_axis_label(vv)) for vv in normvars_for_extra])
+            if normvars_for_extra:
+                if len(normvars_for_extra) == 1:
+                    binsid = strip_units(lookup_axis_label(normvars_for_extra[0]))
+                else:
+                    binsid = '(%s)' % ', '.join([strip_units(lookup_axis_label(vv)) for vv in normvars_for_extra])
 
-            ylabel += ' (normalized per %s bin)' % binsid
+                ylabel += ' (normalized per %s bin)' % binsid
 
     return ylabel

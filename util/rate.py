@@ -22,6 +22,10 @@ class RateHistStruct:
         self._Hpass = Hpass
         self._Hfail = Hfail
 
+        print("RATE HIST")
+        print("\tpass.sum()", self._Hpass.sum())
+        print("\tfail.sum()", self._Hfail.sum())
+
         if Hpass.axes != Hfail.axes:
             raise RuntimeError("RateHistStruct: Hpass and Hfail must have the same axes!")
 
@@ -63,6 +67,10 @@ class RateHistStruct:
     def values(self, flow=False): 
         Ntotal = self._Hpass.values(flow=flow) + self._Hfail.values(flow=flow)
         Npass = self._Hpass.values(flow=flow)
+        print("RateHistStruct.values():")
+        print("\tNpass", Npass)
+        print("\tNfail", Ntotal)
+        print("\tRate", Npass / Ntotal)
         return Npass / Ntotal
     
     # error propagation for ratio Npass / (Npass + Nfail)

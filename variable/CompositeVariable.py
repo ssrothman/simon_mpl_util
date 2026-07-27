@@ -1,8 +1,272 @@
+from enum import IntEnum
+
 from .Variable import BasicVariable, UFuncVariable, SumVariable, DifferenceVariable
 from .VariableBase import VariableBase
 from simonplot.typing.Protocols import VariableProtocol
 
 from simonpy.coordinates import xyz_to_eta_phi
+import numpy as np
+
+class SplittingClass(IntEnum):
+    other = 0
+    gTOggTOgg = 1
+    gTOggTOqq = 2
+    gTOqqTOqg = 3
+    qTOqgTOgg = 4
+    qTOqgTOqq = 5
+    qTOgqTOgq = 6    
+
+class SplittingPdgIdsToSplittingClass(VariableBase):
+
+    def __init__(self,
+                 pdgid1 : VariableProtocol | str,
+                 pdgid2 : VariableProtocol | str,
+                 pdgid3 : VariableProtocol | str,
+                 pdgid4 : VariableProtocol | str,
+                 pdgid5 : VariableProtocol | str,
+                 pdgid6 : VariableProtocol | str):
+        if isinstance(pdgid1, str):
+            pdgid1 = BasicVariable(pdgid1)
+        if isinstance(pdgid2, str):
+            pdgid2 = BasicVariable(pdgid2)
+        if isinstance(pdgid3, str):
+            pdgid3 = BasicVariable(pdgid3)
+        if isinstance(pdgid4, str):
+            pdgid4 = BasicVariable(pdgid4)
+        if isinstance(pdgid5, str):
+            pdgid5 = BasicVariable(pdgid5)
+        if isinstance(pdgid6, str):
+            pdgid6 = BasicVariable(pdgid6)
+
+        self._pdgid1 = pdgid1
+        self._pdgid2 = pdgid2
+        self._pdgid3 = pdgid3
+        self._pdgid4 = pdgid4   
+        self._pdgid5 = pdgid5
+        self._pdgid6 = pdgid6
+
+    @property
+    def _natural_centerline(self):
+        return None
+    
+    @property
+    def prebinned(self):
+        return False
+    
+    @property
+    def columns(self):
+        return list(set(
+            self._pdgid1.columns +
+            self._pdgid2.columns +
+            self._pdgid3.columns +
+            self._pdgid4.columns +
+            self._pdgid5.columns +
+            self._pdgid6.columns
+        ))
+    
+    def evaluate(self, dataset, cut):
+        pdgid1 = self._pdgid1.evaluate(dataset, cut)
+        pdgid2 = self._pdgid2.evaluate(dataset, cut)
+        pdgid3 = self._pdgid3.evaluate(dataset, cut)
+        pdgid4 = self._pdgid4.evaluate(dataset, cut)
+        pdgid5 = self._pdgid5.evaluate(dataset, cut)
+        pdgid6 = self._pdgid6.evaluate(dataset, cut)
+
+        isG1 = (pdgid1 == 21)
+        isG2 = (pdgid2 == 21)
+        isG3 = (pdgid3 == 21)
+        isG4 = (pdgid4 == 21)
+        isG5 = (pdgid5 == 21)
+        isG6 = (pdgid6 == 21)
+
+        isQ1 = (np.abs(pdgid1) <= 6) & (np.abs(pdgid1) > 0)
+        isQ2 = (np.abs(pdgid2) <= 6) & (np.abs(pdgid2) > 0)
+        isQ3 = (np.abs(pdgid3) <= 6) & (np.abs(pdgid3) > 0)
+        isQ4 = (np.abs(pdgid4) <= 6) & (np.abs(pdgid4) > 0)
+        isQ5 = (np.abs(pdgid5) <= 6) & (np.abs(pdgid5) > 0)
+        isQ6 = (np.abs(pdgid6) <= 6) & (np.abs(pdgid6) > 0)
+
+        # first splitting
+        gTOgg1 = isG1 & isG2 & isG3
+        gTOqq1 = isG1 & isQ2 & isQ3
+        qTOqg1 = isQ1 & ( (isQ2 & isG3) | (isG2 & isQ3) )
+
+        gTOgg2 = isG4 & isG5 & isG6
+        gTOqq2 = isG4 & isQ5 & isQ6
+        qTOqg2 = isQ4 & ( (isQ5 & isG6) | (isG5 & isQ6) )
+
+        gTOggTOgg = gTOgg1 & gTOgg2
+        gTOggTOqq = gTOgg1 & gTOqq2
+        gTOqqTOqg = gTOqq1 & qTOqg2
+        qTOqgTOgg = qTOqg1 & gTOgg2
+        qTOqgTOqq = qTOqg1 & gTOqq2
+        qTOgqTOgq = qTOqg1 & qTOqg2
+
+        splitting_class = np.where(
+            gTOggTOgg, SplittingClass.gTOggTOgg,
+            np.where(
+                gTOggTOqq, SplittingClass.gTOggTOqq,
+                np.where(
+                    gTOqqTOqg, SplittingClass.gTOqqTOqg,
+                    np.where(
+                        qTOqgTOgg, SplittingClass.qTOqgTOgg,
+                        np.where(
+                            qTOqgTOqq, SplittingClass.qTOqgTOqq,
+                            np.where(
+                                qTOgqTOgq, SplittingClass.qTOgqTOgq,
+                                SplittingClass.other
+                            )
+                        )
+                    )
+                )
+            )
+        )
+
+    def to_pyarrow_expression(self):
+        import pyarrow.compute as pc
+        pdgid1 = self._pdgid1.to_pyarrow_expression()
+        pdgid2 = self._pdgid2.to_pyarrow_expression()
+        pdgid3 = self._pdgid3.to_pyarrow_expression()
+        pdgid4 = self._pdgid4.to_pyarrow_expression()
+        pdgid5 = self._pdgid5.to_pyarrow_expression()
+        pdgid6 = self._pdgid6.to_pyarrow_expression()
+
+        if pdgid1 is None or pdgid2 is None or pdgid3 is None or pdgid4 is None or pdgid5 is None or pdgid6 is None:
+            raise ValueError("Cannot convert SplittingPdgIdsToSplittingClass to pyarrow expression because one or more of the pdgid variables is not convertible to pyarrow expression.")
+        
+        pdgid1 = pc.abs(pdgid1)
+        pdgid2 = pc.abs(pdgid2)
+        pdgid3 = pc.abs(pdgid3)
+        pdgid4 = pc.abs(pdgid4)
+        pdgid5 = pc.abs(pdgid5)
+        pdgid6 = pc.abs(pdgid6)
+
+        isG1 = pc.equal(pdgid1, 21)
+        isG2 = pc.equal(pdgid2, 21)
+        isG3 = pc.equal(pdgid3, 21)
+        isG4 = pc.equal(pdgid4, 21)
+        isG5 = pc.equal(pdgid5, 21)
+        isG6 = pc.equal(pdgid6, 21)
+
+        isQ1 = pc.and_kleene(pc.less_equal(pdgid1, 6), pc.greater(pdgid1, 0))
+        isQ2 = pc.and_kleene(pc.less_equal(pdgid2, 6), pc.greater(pdgid2, 0))
+        isQ3 = pc.and_kleene(pc.less_equal(pdgid3, 6), pc.greater(pdgid3, 0))
+        isQ4 = pc.and_kleene(pc.less_equal(pdgid4, 6), pc.greater(pdgid4, 0))
+        isQ5 = pc.and_kleene(pc.less_equal(pdgid5, 6), pc.greater(pdgid5, 0))
+        isQ6 = pc.and_kleene(pc.less_equal(pdgid6, 6), pc.greater(pdgid6, 0))
+
+        gTOgg1 = pc.and_kleene(
+            isG1,
+            pc.and_kleene(
+                isG2,
+                isG3
+            )
+        )
+        gTOqq1 = pc.and_kleene(
+            isG1,
+            pc.and_kleene(
+                isQ2,
+                isQ3
+            )
+        )
+        qTOqg1 = pc.and_kleene(
+            isQ1,
+            pc.or_kleene(
+                pc.and_kleene(
+                    isQ2,
+                    isG3
+                ),
+                pc.and_kleene(
+                    isG2,
+                    isQ3
+                )
+            )
+        )
+
+        gTOgg2 = pc.and_kleene(
+            isG4,
+            pc.and_kleene(
+                isG5,
+                isG6
+            )
+        )   
+        gTOqq2 = pc.and_kleene(
+            isG4,
+            pc.and_kleene(
+                isQ5,
+                isQ6
+            )
+        )
+        qTOqg2 = pc.and_kleene(
+            isQ4,
+            pc.or_kleene(
+                pc.and_kleene(
+                    isQ5,
+                    isG6
+                ),
+                pc.and_kleene(
+                    isG5,
+                    isQ6
+                )
+            )
+        )
+
+        gTOggTOgg = pc.and_kleene(gTOgg1, gTOgg2)
+        gTOggTOqq = pc.and_kleene(gTOgg1, gTOqq2)
+        gTOqqTOqg = pc.and_kleene(gTOqq1, qTOqg2)
+        qTOqgTOgg = pc.and_kleene(qTOqg1, gTOgg2)
+        qTOqgTOqq = pc.and_kleene(qTOqg1, gTOqq2)
+        qTOgqTOgq = pc.and_kleene(qTOqg1, qTOqg2)
+
+        return pc.if_else(
+            gTOggTOgg, pc.scalar(SplittingClass.gTOggTOgg),
+            pc.if_else(
+                gTOggTOqq, pc.scalar(SplittingClass.gTOggTOqq),
+                pc.if_else(
+                    gTOqqTOqg, pc.scalar(SplittingClass.gTOqqTOqg),
+                    pc.if_else(
+                        qTOqgTOgg, pc.scalar(SplittingClass.qTOqgTOgg),
+                        pc.if_else(
+                            qTOqgTOqq, pc.scalar(SplittingClass.qTOqgTOqq),
+                            pc.if_else(
+                                qTOgqTOgq, pc.scalar(SplittingClass.qTOgqTOgq),
+                                pc.scalar(SplittingClass.other)
+                            )
+                        )
+                    )
+                )
+            )
+        )
+
+    @property
+    def key(self):
+        return "SplittingPdgIdsToSplittingClass(%s_%s_%s_%s_%s_%s)" % (
+            self._pdgid1.key,
+            self._pdgid2.key,
+            self._pdgid3.key,
+            self._pdgid4.key,
+            self._pdgid5.key,
+            self._pdgid6.key
+        )
+    
+    def __eq__(self, other):
+        if type(other) is not SplittingPdgIdsToSplittingClass:
+            return False
+        
+        return (self._pdgid1 == other._pdgid1 and
+                self._pdgid2 == other._pdgid2 and
+                self._pdgid3 == other._pdgid3 and
+                self._pdgid4 == other._pdgid4 and
+                self._pdgid5 == other._pdgid5 and
+                self._pdgid6 == other._pdgid6)
+    
+    def set_collection_name(self, collection_name):
+        self._pdgid1.set_collection_name(collection_name)
+        self._pdgid2.set_collection_name(collection_name)
+        self._pdgid3.set_collection_name(collection_name)
+        self._pdgid4.set_collection_name(collection_name)
+        self._pdgid5.set_collection_name(collection_name)
+        self._pdgid6.set_collection_name(collection_name)
 
 class RelativeResolutionVariable(VariableBase):
     def __init__(self, gen : VariableProtocol | str, reco : VariableProtocol | str):
